@@ -7,8 +7,11 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+from typing import Literal
 
-from app.transcript import bilibili, cache, captions
+from app.transcript import bilibili, cache, captions, translation_cache, subtitle_translation
+from app.llm import opencode
 
 router = APIRouter(prefix="/subtitles", tags=["subtitles"])
 _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -77,12 +80,58 @@ def get_subtitles(
     cues = parse_timed_cues(text)
     if not cues:
         raise HTTPException(404, "逐字稿沒有可顯示的時間戳字幕。")
+    # 讀取本機已有的譯文，不觸發 AI API；切換影片或重新開啟時不需重複付費或運算。
+    model = opencode.DEFAULT_FREE_MODEL
+    translated_count = 0
+    for cue in cues:
+        cue["translation"] = translation_cache.get(cue["text"], model)
+        if cue["translation"]:
+            translated_count += 1
     return {
+        "translated_count": translated_count,
         "platform": platform,
         "video_id": video_id,
         "page": page,
         "is_chinese": is_chinese,
         "cues": cues,
-        "translation_status": "not_available",
+        "translation_status": ("complete" if translated_count == len(cues) else
+                               "partial" if translated_count else "not_available"),
         "timing_precision": "seconds_estimated",
+    }
+
+
+
+class TranslateRequest(BaseModel):
+    platform: Literal["youtube", "bilibili"]
+    video_id: str = Field(min_length=1, max_length=20)
+    page: int = Field(default=1, ge=1, le=1000)
+    start_index: int = Field(default=0, ge=0, le=5999)
+    batch_size: int = Field(default=16, ge=1, le=16)
+
+
+@router.post("/translate")
+def translate_subtitles(req: TranslateRequest) -> dict:
+    """使用者按下翻譯後才執行。原文由伺服器取得，防止任意文字被拿來消耗模型。"""
+    source = get_subtitles(req.platform, req.video_id, req.page)
+    cues = source["cues"]
+    if req.start_index >= len(cues):
+        raise HTTPException(400, "翻譯位置超出影片字幕範圍。")
+    selected = cues[req.start_index:req.start_index + req.batch_size]
+    indexed = [{"id": req.start_index + index, "text": cue["text"]}
+               for index, cue in enumerate(selected)]
+    try:
+        translations, model = subtitle_translation.translate_batch(indexed)
+    except ValueError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    except Exception as exc:
+        # 供應商金鑰、HTTP 回應或原始逐字稿不得透過錯誤訊息洩漏給瀏覽器。
+        raise HTTPException(502, "免費字幕翻譯服務暫時無法使用，請稍後重試。") from exc
+    return {
+        "platform": req.platform,
+        "video_id": req.video_id,
+        "page": req.page,
+        "translations": translations,
+        "next_index": req.start_index + len(selected),
+        "total": len(cues),
+        "model": model,
     }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTime } from '../utils.js'
-import { getSubtitles } from '../api.js'
-import { activeCueIndex, visibleCues } from '../utils/subtitles.js'
+import { getSubtitles, translateSubtitles } from '../api.js'
+import { activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex } from '../utils/subtitles.js'
 import { useI18n } from '../i18n/index.jsx'
 
 // 官方 YouTube IFrame API；只建立一份載入 Promise，避免重複注入 script。
@@ -116,16 +116,30 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   const [filter, setFilter] = useState('')
   const [time, setTime] = useState(0)
   const [manualSeek, setManualSeek] = useState({t:0,key:0,auto:false})
+  const [translating, setTranslating] = useState(false)
+  const [translateError, setTranslateError] = useState('')
+  const [nextIndex, setNextIndex] = useState(0)
+  const [showBilingual, setShowBilingual] = useState(true)
+  const sourceGeneration = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    sourceGeneration.current++
     setCues([])
     setFilter('')
     setTime(0)
     setSubtitleError('')
+    setTranslateError('')
+    setTranslating(false)
+    setNextIndex(0)
+    setShowBilingual(true)
     setLoading(true)
     getSubtitles(platform, videoId, page).then(result => {
-      if (!cancelled) setCues(result.cues || [])
+      if (!cancelled) {
+        const data = result.cues || []
+        setCues(data)
+        setNextIndex(nextUntranslatedIndex(data))
+      }
     }).catch(err => {
       if (!cancelled) setSubtitleError(err.message)
     }).finally(() => { if (!cancelled) setLoading(false) })
@@ -136,6 +150,26 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   useEffect(() => { setSeek(startAt) }, [startAt.key])
   useEffect(() => { if (manualSeek.key) setSeek(manualSeek) }, [manualSeek.key])
 
+  async function handleTranslate() {
+    if (!cues.length || translating || nextIndex >= cues.length) return
+    const generation = sourceGeneration.current
+    const index = nextIndex
+    setTranslating(true)
+    setTranslateError('')
+    try {
+      const response = await translateSubtitles(platform, videoId, page, index, 16)
+      if (sourceGeneration.current !== generation) return
+      const updated = applyTranslations(cues, response.translations)
+      setCues(updated)
+      setNextIndex(nextUntranslatedIndex(updated, response.next_index))
+      setShowBilingual(true)
+    } catch (error) {
+      if (sourceGeneration.current === generation) setTranslateError(error.message)
+    } finally {
+      if (sourceGeneration.current === generation) setTranslating(false)
+    }
+  }
+
   function jumpTo(seconds) {
     setTime(seconds)
     setManualSeek(s => ({t:seconds,auto:true,key:s.key+1}))
@@ -143,6 +177,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
 
   // YouTube 的原生 API 可讀取真實進度；Bilibili 官方 iframe 目前只支援帶秒數重新開啟。
   const active = platform === 'youtube' ? activeCueIndex(cues, time) : -1
+  const translatedCount = cues.filter(c => !!c.translation).length
   const matched = useMemo(() => visibleCues(cues, filter), [cues, filter])
   const visible = filter.trim() ? matched.slice(0, 120) : cues.slice(Math.max(0, active - 25), Math.max(80, active + 55))
   const biliSrc = `https://player.bilibili.com/player.html?bvid=${videoId}&p=${page}&t=${seek.t}&autoplay=${seek.auto?1:0}`
@@ -159,8 +194,21 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
       <section className="subtitles-panel" aria-label={t('subtitles.title')}>
         <div className="subtitles-head">
           <strong>{t('subtitles.title')}</strong>
-          <span>{t('subtitles.originalOnly')}</span>
+          <span>{t('subtitles.translationProgress', translatedCount, cues.length)}</span>
         </div>
+        {!loading && !subtitleError && cues.length>0 && <div className="subtitles-controls">
+          <button className="btn-paper" onClick={handleTranslate}
+                  disabled={translating || nextIndex >= cues.length}>
+            {translating ? t('subtitles.translating') :
+              nextIndex>=cues.length ? t('subtitles.translateDone') :
+              t('subtitles.translateNext',Math.min(16,cues.length-nextIndex))}
+          </button>
+          <label className="subtitles-bilingual-toggle">
+            <input type="checkbox" checked={showBilingual} onChange={e=>setShowBilingual(e.target.checked)}/>
+            {t('subtitles.showTranslation')}
+          </label>
+        </div>}
+        {translateError && <p className="subtitles-hint" role="alert">{t('subtitles.translateFailed',translateError)}</p>}
         <input className="subtitles-search" type="search" value={filter} onChange={e=>setFilter(e.target.value)}
           placeholder={t('subtitles.search')} aria-label={t('subtitles.search')}/>
         {platform === 'bilibili' && <p className="subtitles-hint">{t('subtitles.bilibiliLimit')}</p>}
@@ -174,7 +222,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
                   <span className="subtitle-time">{fmtTime(cue.start)}</span>
                   <span className="subtitle-words">
                     <span>{cue.text}</span>
-                    {cue.translation&&<span className="subtitle-translation">{cue.translation}</span>}
+                    {showBilingual&&cue.translation&&<span className="subtitle-translation">{cue.translation}</span>}
                   </span>
                 </button>
               ))}

@@ -428,3 +428,10 @@ button:disabled{cursor:not-allowed}
 .subtitle-translation{color:var(--text-faint)}
 .subtitles-hint{margin:10px 2px 2px;color:var(--text-faint);font-size:12px;line-height:1.5}
 @media(max-width:600px){.subtitles-head{align-items:flex-start;flex-direction:column}.subtitles-head span{text-align:left}}
+
+/* 原文與繁中譯文可個別顯示；逐批翻譯需使用者明確按下按鈕。 */
+.subtitles-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0 3px}
+.subtitles-controls .btn-paper{font-size:12px;min-height:36px;padding:6px 11px}
+.subtitles-bilingual-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-soft);cursor:pointer}
+.subtitles-bilingual-toggle input{accent-color:var(--accent);width:15px;height:15px}
+.subtitle-translation{color:var(--text);font-size:13px}

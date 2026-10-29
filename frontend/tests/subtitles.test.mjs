@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {activeCueIndex, visibleCues} from '../src/utils/subtitles.js'
+import {activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex} from '../src/utils/subtitles.js'
 
 const cues = [
   {start:0,end:4,text:'Hello'},
@@ -22,4 +22,28 @@ test('searches source and translation without changing time order',()=>{
   assert.deepEqual(visibleCues(cues,'歡迎'),[cues[1]])
   assert.deepEqual(visibleCues(cues,'HELLO'),[cues[0]])
   assert.equal(visibleCues(cues,'').length,3)
+})
+
+test('partial translation only updates matching subtitle index',()=>{
+  const changed = applyTranslations(cues, [{id:1,translation:'這是新的譯文'}, {id:19,translation:'忽略'}])
+  assert.equal(changed[0].translation,undefined)
+  assert.equal(changed[1].translation,'這是新的譯文')
+  assert.equal(changed[1].start,4)
+  assert.equal(changed[2].text,'Goodbye')
+  assert.deepEqual(visibleCues(changed,'新的譯文'),[changed[1]])
+  assert.equal(cues[1].translation,'歡迎')
+})
+
+test('continues after cached translations when reopening a video',()=>{
+  const data=[
+    {text:'A',translation:'甲'},
+    {text:'B',translation:'乙'},
+    {text:'C',translation:null},
+    {text:'D',translation:'丁'},
+    {text:'E',translation:null},
+  ]
+  assert.equal(nextUntranslatedIndex(data),2)
+  assert.equal(nextUntranslatedIndex(data,3),4)
+  assert.equal(nextUntranslatedIndex(data,5),5)
+  assert.equal(nextUntranslatedIndex([{text:'A',translation:'甲'}]),1)
 })

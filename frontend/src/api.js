@@ -62,6 +62,8 @@ export async function getSubtitles(platform, videoId, page=1) {
   }
   return res.json()
 }
+export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batchSize=16) =>
+  post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize})
 export const saveNote  = (payload) => post('/notes/save', payload)
 export async function notesStatus() {
   try { const r=await fetch(BASE+'/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
