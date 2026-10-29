@@ -34,6 +34,10 @@ AstraTube 現在預設使用**一般使用者模式**：不需要先設定 API �
 
 在同一台電腦啟動 Ollama，於 **設定 → 開發者模式 → Ollama 本地 AI** 設定本機網址及模型。按「測試已儲存的 Ollama 連線」確認狀態，並從模型選單選擇 `ollama:<模型>`，即可使用本地模型產生摘要、知識卡與影片問答。本功能不需要 API Key，且**不會自動改用付費雲端模型**。目前限定同環境的回環介面 11434 埠；**Codespaces 無法直接連線到你 Windows 電腦的 Ollama**。字幕逐句翻譯在開發者模式也可以選擇已安裝的 Ollama 模型；一般模式依然預設免費線上模型。詳見 [Ollama 開發指南](docs/OLLAMA.zh-TW.md)。
 
+## Windows 桌面版 Alpha（測試專用）
+
+AstraTube 已新增 Tauri v2 + FastAPI Sidecar 的 Windows 桌面架構與自動化建置流程。安裝包的目標是不要求一般使用者自行安裝 Python／Node.js，但**尚未完成 Windows 實機使用驗收、數位簽章及對外發布**。請參閱 [Windows 桌面版開發／測試指南](docs/DESKTOP.zh-TW.md)。
+
 ## 快速開始：GitHub Codespaces
 
 1. 在 GitHub 的 **Code → Codespaces → Create codespace** 建立開發環境。

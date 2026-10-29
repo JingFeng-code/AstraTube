@@ -16,7 +16,10 @@ from dotenv import load_dotenv
 # config.py 位於 backend/app/core/，往上三層即專案根
 _ROOT = Path(__file__).resolve().parents[3]
 _ENV_PATH = _ROOT / ".env"
-_SETTINGS_PATH = _ROOT / "settings.json"
+# Packaged binaries live in a read-only install directory; user data belongs in
+# LOCALAPPDATA / Tauri's app_data_dir (the Rust launcher sets this environment).
+_DATA_ROOT = Path(os.environ["ASTRA_DESKTOP_DATA_DIR"]).resolve() if os.environ.get("ASTRA_DESKTOP_DATA_DIR") else _ROOT
+_SETTINGS_PATH = _DATA_ROOT / "settings.json"
 
 load_dotenv(_ENV_PATH)
 
@@ -132,6 +135,7 @@ def save(updates: dict) -> dict[str, str]:
     merged = _read_settings_file()
     merged.update(_cache)
     try:
+        _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
         _SETTINGS_PATH.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
         # 只帶原始錯誤；給使用者看的句子由 API 層依介面語言組裝。

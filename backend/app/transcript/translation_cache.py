@@ -5,10 +5,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 from pathlib import Path
 
-CACHE_DIR = Path(__file__).resolve().parents[3] / ".cache" / "subtitle_translations"
+CACHE_DIR = (Path(os.environ["ASTRA_DESKTOP_DATA_DIR"]) if os.environ.get("ASTRA_DESKTOP_DATA_DIR") else Path(__file__).resolve().parents[3]) / ".cache" / "subtitle_translations"
 _VERSION = "zh-hant-tw-v1"
 
 

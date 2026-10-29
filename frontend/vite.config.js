@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // Codespaces 需要監聽所有容器介面；本機仍只綁 loopback。
 // 同源 /api 代理避免瀏覽器將 127.0.0.1 誤認為使用者自己的電腦。
 export default defineConfig({
+  base: process.env.VITE_DESKTOP_BUILD === '1' ? './' : '/',
   plugins: [react()],
   server: {
     host: process.env.CODESPACES ? '0.0.0.0' : '127.0.0.1',

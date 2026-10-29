@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from app.transcript import bilibili
 
-CACHE_DIR = Path(__file__).resolve().parents[3] / ".cache" / "imported_subtitles"
+CACHE_DIR = (Path(os.environ["ASTRA_DESKTOP_DATA_DIR"]) if os.environ.get("ASTRA_DESKTOP_DATA_DIR") else Path(__file__).resolve().parents[3]) / ".cache" / "imported_subtitles"
 MAX_FILE_BYTES = 1024 * 1024
 MAX_CUES = 6000
 MAX_SECONDS = 360000

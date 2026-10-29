@@ -1,21 +1,27 @@
+import { getDesktopConnection } from './desktop.js'
 // 預設透過 Vite 同源 /api 代理呼叫 FastAPI，支援 Codespaces 與本地開發。
 // 正式部署時需提供 /api 反向代理；也可使用 VITE_API_BASE 覆寫。
 const BASE = import.meta.env?.VITE_API_BASE || '/api'
+export function apiFetch(path,options={}) {
+  const desktop=getDesktopConnection()
+  if (!desktop) return fetch(BASE+path,options)
+  return fetch(desktop.origin+path,{...options,headers:{...options.headers,'X-Astra-Desktop-Token':desktop.token}})
+}
 
 async function post(path, body) {
-  const res = await fetch(BASE+path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  const res = await apiFetch(path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   if (!res.ok) { let m='HTTP '+res.status; try{const d=await res.json();m=d.detail||JSON.stringify(d)}catch{} throw new Error(m) }
   return res.json()
 }
 async function get(path) {
-  const res = await fetch(BASE+path)
+  const res = await apiFetch(path)
   if (!res.ok) throw new Error('HTTP '+res.status)
   return res.json()
 }
 // NDJSON 串流共用解析（摘要與實作都走這條）。
 // 只吞壞行，不吞 onEvent 內拋出的錯（如 fatal）——那是呼叫端要處理的。
 async function postStream(path, body, onEvent) {
-  const res = await fetch(BASE+path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  const res = await apiFetch(path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   if (!res.ok) { let m='HTTP '+res.status; try{const d=await res.json();m=d.detail||JSON.stringify(d)}catch{} throw new Error(m) }
   const reader = res.body.getReader(), dec = new TextDecoder()
   let buf = ''
@@ -56,7 +62,7 @@ export async function getSubtitles(platform, videoId, page=1, translationProvide
     +'&video_id='+encodeURIComponent(videoId)
     +'&page='+encodeURIComponent(page)
     +'&translation_provider='+encodeURIComponent(translationProvider)
-  const res = await fetch(BASE+path)
+  const res = await apiFetch(path)
   if (!res.ok) {
     const data = await res.json().catch(() => null)
     throw new Error(data?.detail || 'HTTP '+res.status)
@@ -71,7 +77,7 @@ export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batc
   post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize, translation_provider:translationProvider})
 export const saveNote  = (payload) => post('/notes/save', payload)
 export async function notesStatus() {
-  try { const r=await fetch(BASE+'/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
+  try { const r=await apiFetch('/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
   catch { return {configured:false,exists:false,offline:true} }
 }
 export async function notesFolders() {
@@ -81,7 +87,7 @@ export async function notesFiles(folder) {
   try { return await get('/notes/files?folder='+encodeURIComponent(folder||'')) } catch { return {files:[]} }
 }
 export async function getSettings() {
-  try { const r=await fetch(BASE+'/settings'); return r.ok?r.json():{configured:false,offline:true} }
+  try { const r=await apiFetch('/settings'); return r.ok?r.json():{configured:false,offline:true} }
   catch { return {configured:false,offline:true} }
 }
 export const saveSettings = (payload) => post('/settings', payload)

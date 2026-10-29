@@ -3,11 +3,12 @@
 key 請自帶版本前綴（例如 "deepsrt_v1:<video_id>"），避免不同轉錄來源互相污染。
 """
 import hashlib
+import os
 import json
 from pathlib import Path
 from typing import Optional, Tuple
 
-CACHE_DIR = Path(__file__).resolve().parents[3] / ".cache" / "transcripts"
+CACHE_DIR = (Path(os.environ["ASTRA_DESKTOP_DATA_DIR"]) if os.environ.get("ASTRA_DESKTOP_DATA_DIR") else Path(__file__).resolve().parents[3]) / ".cache" / "transcripts"
 
 
 def _path(key: str) -> Path:

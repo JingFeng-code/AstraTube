@@ -85,3 +85,15 @@
 - [ ] 真實瀏覽器驗收與跨平台播放器的毫秒級跳轉誤差測試
 - [ ] 影片平台原生字幕時間精度保存（目前僅匯入 SRT/VTT 保留原始起迄）
 - [ ] 公開多人部署前須完成使用者認證、隔離與檔案存取限制
+
+
+## Phase 4a：Windows Desktop Alpha（Issue #14）
+- [x] 建立 Tauri v2 Desktop Shell、重用 React 與 FastAPI
+- [x] 新增 Windows PyInstaller Sidecar 封裝與 GitHub Actions 測試安裝包工作流程
+- [x] 本機隨機埠與每次啟動的一次性 Token 驗證
+- [x] Desktop 設定、字幕、逐字稿快取移入使用者資料目錄
+- [x] 保留 Web／Codespaces 使用模式
+- [ ] Windows NSIS 安裝及實機 UI 驗收（自動建置通過不等於實機操作）
+- [ ] 製作品質較佳的正式 App 圖示、數位簽章與更新功能
+- [ ] 增加桌面端完整 Whisper 轉錄等原生依賴（Alpha 尚未包含）
+- [ ] 公開下載前的版權合規、安全與隱私稽核
