@@ -22,7 +22,7 @@ export const STRINGS = {
     'vault.connected': 'Obsidian connected',
 
     'input.section': 'Add a source',
-    'input.placeholder': 'Paste a YouTube or article URL',
+    'input.placeholder': 'Paste a YouTube, Bilibili, or article URL',
     'input.auto': 'Auto (recommended)',
     'input.free': 'free',
     'input.needsKey': 'needs API key',
@@ -242,7 +242,7 @@ export const STRINGS = {
     'vault.connected': 'Obsidian 已連接',
 
     'input.section': '新增來源',
-    'input.placeholder': '貼上 YouTube 或文章網址',
+    'input.placeholder': '貼上 YouTube、Bilibili（B 站）或文章網址',
     'input.auto': '自動（推薦）',
     'input.free': '免費',
     'input.needsKey': '需填金鑰',

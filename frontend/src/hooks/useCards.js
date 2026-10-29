@@ -26,7 +26,7 @@ export default function useCards(result, provider, initial = {}) {
       transcript: pickField(c, TRANSCRIPT_KEYS), translation: pickField(c, TRANSLATION_KEYS),
       visual: c.visual || null,
       ts: c.timestamp_seconds ?? null,
-      link: result?.youtube_video_id != null ? youtubeLink(result.youtube_video_id, c.timestamp_seconds) : result?.source_url || null,
+      link: result?.youtube_video_id != null ? youtubeLink(result.youtube_video_id, c.timestamp_seconds) : result?.bilibili_video_id ? `https://www.bilibili.com/video/${result.bilibili_video_id}/?p=${result.bilibili_page||1}&t=${Math.max(0,Math.floor(c.timestamp_seconds||0))}` : result?.source_url || null,
       note: '',
     }
     setClips(prev => [...prev, clip])
