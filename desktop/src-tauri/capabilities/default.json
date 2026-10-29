@@ -1,0 +1,10 @@
+{
+  "identifier": "main-app",
+  "description": "AstraTube main window; no shell/file/system access from web content.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}
