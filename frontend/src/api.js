@@ -1,5 +1,6 @@
-// 後端位址。預設 127.0.0.1:8420；用 VITE_API_BASE 覆寫（例如把後端跑在別台機器上）。
-const BASE = import.meta.env?.VITE_API_BASE || 'http://127.0.0.1:8420'
+// 預設透過 Vite 同源 /api 代理呼叫 FastAPI，支援 Codespaces 與本地開發。
+// 正式部署時需提供 /api 反向代理；也可使用 VITE_API_BASE 覆寫。
+const BASE = import.meta.env?.VITE_API_BASE || '/api'
 
 async function post(path, body) {
   const res = await fetch(BASE+path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -41,7 +42,7 @@ export const deepdive  = (provider, source_title, card) => post('/deepdive', {pr
 // status 先問「這台機器有沒有 CLI」，前端據此決定顯示執行、指令、還是安裝教學。
 export async function implementStatus() {
   try { return await get('/implement/status') }
-  catch { return {clis:[],has_cli:false,auto_run:true,output_dir:'',install:[],offline:true} }
+  catch { return {clis:[],has_cli:false,auto_run:false,output_dir:'',install:[],offline:true} }
 }
 export const implementStream = (payload, onEvent) => postStream('/implement', payload, onEvent)
 export const revealOutput = (path) => post('/implement/reveal', {path})

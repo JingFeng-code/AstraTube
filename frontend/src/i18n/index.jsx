@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useState } from 'react'
 import { LANGS, STRINGS } from './strings.js'
 
 const KEY = 'ycr-ui-lang'
-const FALLBACK = 'en'
+const FALLBACK = 'zh'
 
 function detect() {
   try {

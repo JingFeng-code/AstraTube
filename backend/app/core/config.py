@@ -55,7 +55,7 @@ def _defaults() -> dict[str, str]:
         "OBSIDIAN_NOTES_FOLDER": os.getenv("OBSIDIAN_NOTES_FOLDER", _DEFAULT_FOLDER).strip() or _DEFAULT_FOLDER,
         "OUTPUT_DIR": os.getenv("OUTPUT_DIR", _DEFAULT_OUTPUT_DIR).strip().strip('"') or _DEFAULT_OUTPUT_DIR,
         # "1"／"0"：偵測到 CLI 時要不要直接跑。關掉就只產任務包讓使用者自己貼進終端機
-        "AUTO_RUN_CLI": os.getenv("AUTO_RUN_CLI", "1").strip() or "1",
+        "AUTO_RUN_CLI": os.getenv("AUTO_RUN_CLI", "0").strip() or "0",
         # 介面語言（zh-Hant／en）。與 OUTPUT_LANGUAGE 分開：介面是誰在用，輸出是要寫成什麼語言。
         # 後端回給前端的錯誤訊息也跟著這個走，否則外國使用者會看到中文錯誤。
         "UI_LANGUAGE": os.getenv("UI_LANGUAGE", "zh-Hant").strip() or "zh-Hant",
