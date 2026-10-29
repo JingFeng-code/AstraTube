@@ -48,7 +48,10 @@ fn main() {
                 .env("ASTRA_DESKTOP_TOKEN", &token)
                 .env("ASTRA_DESKTOP_PORT", port.to_string())
                 .env("ASTRA_DESKTOP_DATA_DIR", data_dir.to_string_lossy().to_string())
-                .env("AUTO_RUN_CLI", "0");
+                .env("AUTO_RUN_CLI", "0")
+                // The sidecar exits on its own when this process is gone (crash,
+                // forced close, or PyInstaller onefile leaving its child running).
+                .env("ASTRA_DESKTOP_PARENT_PID", std::process::id().to_string());
 
             let (_events, child) = command.spawn()?;
             app.manage(DesktopBackend {

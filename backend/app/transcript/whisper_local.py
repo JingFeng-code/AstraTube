@@ -74,6 +74,10 @@ def transcribe_url(url: str, cache_key: Optional[str] = None) -> Tuple[str, bool
     if cached is not None:
         print(f"[transcribe] 命中快取，直接回傳（{key}）", flush=True)
         return cached
+    if getattr(sys, "frozen", False):
+        # 打包後 sys.executable 是後端自己，"-m yt_dlp" 會重複啟動後端而不是下載音訊；
+        # 桌面 Alpha 也沒有內建 Whisper／yt-dlp，直接告訴使用者可行的替代方案。
+        raise ValueError(messages.t("whisper.unavailable_desktop"))
 
     tmpdir = tempfile.mkdtemp(prefix="ycr_audio_")
     try:
