@@ -60,6 +60,9 @@ jobs:
         shell: pwsh
         run: ./scripts/build-desktop.ps1 -SkipInstall
 
+      - name: Rust unit tests (isolated YouTube player protocol)
+        run: cargo test --release --manifest-path desktop/src-tauri/Cargo.toml
+
       - name: Upload private CI installer artifact (not a public release)
         if: success()
         uses: actions/upload-artifact@v4

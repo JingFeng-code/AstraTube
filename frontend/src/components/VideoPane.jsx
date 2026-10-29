@@ -4,109 +4,84 @@ import { getSubtitles, translateSubtitles } from '../api.js'
 import { activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex } from '../utils/subtitles.js'
 import { useI18n } from '../i18n/index.jsx'
 import { effectiveSubtitleTranslationProvider } from '../utils/subtitle-provider.js'
+import { parsePlayerMessage, playerOrigin, playerUrl, randomChannel, seekMessage } from '../utils/player-bridge.js'
 
-// 官方 YouTube IFrame API；只建立一份載入 Promise，避免重複注入 script。
-let ytApiPromise
-function youtubeApi() {
-  if (window.YT?.Player) return Promise.resolve(window.YT)
-  if (ytApiPromise) return ytApiPromise
-  ytApiPromise = new Promise((resolve, reject) => {
-    const previous = window.onYouTubeIframeAPIReady
-    let finished = false
-    const fail = () => {
-      if (finished) return
-      finished = true
-      ytApiPromise = null
-      reject(new Error('YouTube IFrame API unavailable'))
-    }
-    const timer = window.setTimeout(fail, 10000)
-    window.onYouTubeIframeAPIReady = () => {
-      window.clearTimeout(timer)
-      if (finished) return
-      finished = true
-      if (typeof previous === 'function') previous()
-      resolve(window.YT)
-    }
-    let script = document.querySelector('script[data-astratube-youtube-api]')
-    if (!script) {
-      script = document.createElement('script')
-      script.src = 'https://www.youtube.com/iframe_api'
-      script.async = true
-      script.dataset.astratubeYoutubeApi = '1'
-      document.head.appendChild(script)
-    }
-    script.addEventListener('error', fail, { once: true })
-  })
-  return ytApiPromise
-}
-
+// YouTube 播放器放在獨立來源的 iframe（public/player/youtube.html）內，
+// 官方 IFrame API 腳本只在那個 iframe 執行，不會進入具有 Tauri IPC 的主視窗。
 function YouTubePlayer({ videoId, startAt, onTime }) {
-  const rootRef = useRef(null)
-  const playerRef = useRef(null)
+  const frameRef = useRef(null)
   const readyRef = useRef(false)
   const seekRef = useRef(startAt)
   const onTimeRef = useRef(onTime)
   const [fallback, setFallback] = useState(false)
+  // 每支影片一組新的隨機頻道；來源與網址只在影片切換時計算一次
+  const session = useMemo(() => {
+    const parentOrigin = window.location.origin
+    const hostOrigin = playerOrigin({
+      isTauri: Boolean(window.__TAURI_INTERNALS__),
+      userAgent: navigator.userAgent,
+      origin: parentOrigin,
+    })
+    const channel = randomChannel()
+    return { hostOrigin, channel, src: playerUrl({ playerOrigin: hostOrigin, parentOrigin, videoId, channel }) }
+  }, [videoId])
 
   useEffect(() => { onTimeRef.current = onTime }, [onTime])
+
+  function sendSeek(target) {
+    const frame = frameRef.current?.contentWindow
+    if (!frame || !readyRef.current) return
+    frame.postMessage(seekMessage(session.channel, target.t, target.auto), session.hostOrigin)
+  }
+
   useEffect(() => {
     if (!startAt.key) return
     seekRef.current = startAt
-    if (readyRef.current && playerRef.current?.seekTo) {
-      playerRef.current.seekTo(startAt.t, true)
-      if (startAt.auto) playerRef.current.playVideo()
-    }
+    sendSeek(startAt)
   }, [startAt.key, startAt.t, startAt.auto])
 
   useEffect(() => {
-    let disposed = false
-    let poll
-    const root = rootRef.current
-    if (!root) return
-    setFallback(false)
     readyRef.current = false
     seekRef.current = startAt
-    const mount = document.createElement('div')
-    root.appendChild(mount)
-    youtubeApi().then(YT => {
-      if (disposed) return
-      playerRef.current = new YT.Player(mount, {
-        videoId,
-        width: '100%',
-        height: '100%',
-        playerVars: { playsinline: 1, rel: 0, origin: window.location.origin },
-        events: {
-          onReady: ({ target }) => {
-            if (disposed) return
-            readyRef.current = true
-            const next = seekRef.current
-            if (next.t > 0) target.seekTo(next.t, true)
-            if (next.auto) target.playVideo()
-            poll = window.setInterval(() => {
-              const current = target.getCurrentTime?.()
-              if (Number.isFinite(current)) onTimeRef.current(current)
-            }, 400)
-          },
-        },
+    setFallback(!session.src)
+    if (!session.src) return
+    // 宿主頁 15 秒內都沒回報就退回一般嵌入（沒有進度同步，但仍可播放）
+    const timer = window.setTimeout(() => { if (!readyRef.current) setFallback(true) }, 15000)
+    function onMessage(event) {
+      const message = parsePlayerMessage(event, {
+        source: frameRef.current?.contentWindow,
+        origin: session.hostOrigin,
+        channel: session.channel,
       })
-    }).catch(() => { if (!disposed) setFallback(true) })
-    return () => {
-      disposed = true
-      window.clearInterval(poll)
-      readyRef.current = false
-      try { playerRef.current?.destroy?.() } catch {}
-      playerRef.current = null
-      root.replaceChildren()
+      if (!message) return
+      if (message.type === 'ready') {
+        readyRef.current = true
+        window.clearTimeout(timer)
+        const next = seekRef.current
+        if (next.t > 0 || next.auto) sendSeek(next)
+      } else if (message.type === 'time') {
+        onTimeRef.current(message.seconds)
+      } else {
+        window.clearTimeout(timer)
+        setFallback(true)
+      }
     }
-  // 影片 ID 變更才重新初始化播放器，時間戳跳轉用 seekTo，避免 iframe 重新載入。
-  }, [videoId])
+    window.addEventListener('message', onMessage)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('message', onMessage)
+      readyRef.current = false
+    }
+  }, [session])
 
   if (fallback) {
     return <iframe key={startAt.key} title="YouTube"
-      src={`https://www.youtube.com/embed/${videoId}?start=${startAt.t}&autoplay=${startAt.auto?1:0}&rel=0`}
+      src={`https://www.youtube.com/embed/${videoId}?start=${Math.floor(startAt.t)}&autoplay=${startAt.auto?1:0}&rel=0`}
       allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
   }
-  return <div className="player-host" ref={rootRef} aria-label="YouTube video player" />
+  return <iframe ref={frameRef} className="player-host" src={session.src} title="YouTube video player"
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
+    referrerPolicy="strict-origin-when-cross-origin" />
 }
 
 export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, developerMode=false, localModels=[], subtitleRevision=0 }) {
