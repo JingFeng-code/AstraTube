@@ -1,0 +1,21 @@
+{
+  "name": "AstraTube (Python + Node)",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "containerEnv": {
+    "AUTO_RUN_CLI": "0"
+  },
+  "forwardPorts": [
+    15273
+  ],
+  "portsAttributes": {
+    "15273": {
+      "label": "AstraTube Web",
+      "onAutoForward": "notify"
+    }
+  }
+}

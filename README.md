@@ -1,0 +1,45 @@
+# AstraTube
+
+個人使用的 AI 影片學習與實作工作台。以 [YouTube Card Reader](https://github.com/chang416/youtube-card-reader) 為基底，目標是保留既有影片知識卡、影片問答、Obsidian 匯出與 Codex / Claude Code 任務產生功能，逐步加入台灣繁體中文體驗、Ollama 與同步雙語字幕。
+
+> **專案狀態：階段 0（開源基底匯入 + Codespaces 開發設定）**。雙語逐句字幕、Ollama 專用設定、VideoToNo 整合尚未完成，請勿視為現有功能。
+
+## 快速開始：GitHub Codespaces
+
+1. 在 GitHub 的 **Code → Codespaces → Create codespace** 建立開發環境。
+2. 開啟終端機執行：
+
+   ```bash
+   bash scripts/start.sh
+   ```
+
+3. 在 **Ports** 面板開啟 **AstraTube Web (15273)** 的轉送網址；保持 Port Visibility 為 **Private**。
+4. 使用有現成字幕的影片測試知識卡與問答。外部免費模型的服務狀態與額度由提供者決定。
+
+第一次執行會下載並安裝 Python/Node 套件；不需要先購買 API 額度。**Codespaces 無法直接使用你個人 Windows 的 Ollama / GPU**。本地運行請參閱 [繁中開發指南](docs/DEVELOPMENT.zh-TW.md)。
+
+## 使用中的開源技術
+
+- **React 18 + Vite**：保留上游 UI；現階段不重寫 Vue / .NET。
+- **FastAPI**：影片字幕來源、知識卡、AI 問答、實作任務、Obsidian。
+- **本地 Whisper**：沿用上游程式，但轉錄可能需要獲授權的音訊來源。
+- **OpenCode Zen / 自備雲端 API**：沿用上游 Provider；Ollama 為後續工作。
+- **GitHub Actions**：上游內建前端建置與後端單元測試。
+
+## 安全與費用
+
+- Coding Agent 的自動執行預設關閉（`AUTO_RUN_CLI=0`）；影片屬於不可信內容，執行前須審查任務。
+- `.env`、`settings.json` 及逐字稿快取已加入 `.gitignore`；請勿提交 API Keys 或私人影片資料。
+- Codespaces 會消耗 GitHub 用量；雲端 AI 也可能另行計費。
+- 使用 YouTube 官方嵌入播放器；取得字幕與影音必須符合平台條款及內容授權。
+
+## 開發文件
+
+- [Codespaces / Windows / WSL 開發指南](docs/DEVELOPMENT.zh-TW.md)
+- [分階段開發路線](docs/ROADMAP.md)
+- [上游原始 README](docs/UPSTREAM_README.md)
+- [第三方授權與來源](THIRD_PARTY_NOTICES.md)
+
+## 開源來源與授權
+
+原始碼來自 [chang416/youtube-card-reader](https://github.com/chang416/youtube-card-reader)，匯入時上游版本：[`7196505e9176`](https://github.com/chang416/youtube-card-reader/commit/7196505e91765059ba9fcda7c859de89d5a5ce04)。這是獨立 Repository 的程式碼匯入，**不是 GitHub Fork，也沒有直接保留上游 Git Commit 歷史**。本專案保留上游 MIT 授權及版權聲明；詳見 [LICENSE](LICENSE) 與 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

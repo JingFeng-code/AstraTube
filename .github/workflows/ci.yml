@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        working-directory: backend
+        # The test suite never touches the network or a real API key, so the
+        # heavyweight optional extras (faster-whisper, yt-dlp) are skipped here.
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi 'uvicorn[standard]' python-dotenv requests beautifulsoup4 \
+                      youtube-transcript-api google-genai anthropic httpx json-repair \
+                      opencc-python-reimplemented
+      - name: Import check
+        working-directory: backend
+        run: python -c "from app.main import app; print('app imports OK')"
+      - name: Unit tests
+        working-directory: backend
+        run: |
+          python tests/test_deepsrt.py
+          python tests/test_progress_stream.py
+          python tests/test_providers.py
+          python tests/test_content_type.py
+          python tests/test_implement.py
+          python tests/test_messages.py
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
