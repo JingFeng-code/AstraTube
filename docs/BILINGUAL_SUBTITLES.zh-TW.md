@@ -11,11 +11,15 @@
 
 ## 開發者與技術限制
 
-- 第一版**固定使用 OpenCode Zen 的預設免費模型**；不會因為你已設定 OpenAI、Gemini、Anthropic 或其他付費金鑰，就將字幕翻譯自動備援到付費模型。
-- API：`GET /subtitles` 會回傳原文與本機已儲存的譯文；`POST /subtitles/translate` 只有在使用者明確操作後才會翻譯一批（最多 16 句）。
+- **一般使用者模式**：固定使用 OpenCode Zen 預設免費模型；不會因為已設定 OpenAI、Gemini、Anthropic 或其他付費金鑰，就自動備援到付費模型。
+- **開發者模式**：可在字幕面板的「字幕翻譯引擎」選擇預設免費線上模型，或選擇**這台 AstraTube 後端可連線的、已下載的 Ollama 模型**。切換引擎會重新載入對應的字幕翻譯快取，不會把其他模型譯文當成自己的。
+- 如選用 Ollama，需先在「設定 → 開發者模式 → Ollama 本地 AI」完成本地連線；若無本地模型，會顯示引導提示。翻譯失敗只會顯示錯誤，不會回退到線上模型。
+- 目前 Ollama 只支援與 AstraTube 後端在**同一環境**的 loopback 11434；Codespaces 不能直接存取 Windows 上的 GPU。
+- API：`GET /subtitles?translation_provider=opencode`（或 `translation_provider=ollama:<model>`）會讀取所選引擎的本機快取；`POST /subtitles/translate` 同樣接受 `translation_provider`，使用者按下按鈕才處理一批（最多 16 句）。後端拒絕任意第三方付費 Provider。
+- 快取依「引擎＋模型＋原文＋版本」分離，保留舊版 OpenCode 已產生的快取；影片字幕的原始時間戳與字句不受翻譯模型切換影響。
 - 後端從已支援的來源重新取得原文，使用者不能利用此端點直接送任意文字給 AI；模型仍會收到該批公開字幕文字，使用者須遵守內容來源及服務提供者條款。
 - 模型回傳 JSON 必須完整對應原字幕的索引，否則本批失敗、不能寫入錯位的快取。
 - 原字幕時間是上游 `[秒數]` 文字格式產生的估算顯示區間，**不是逐字精確對齊**。
 - YouTube 官方播放器可讀取進度並高亮字幕；Bilibili 站外 iframe 尚不具備相同的進度回報能力，仍以點擊字幕時間戳跳轉為主。
 - 因為免費模型服務可能下架、限流或要求金鑰，所以**目前沒有「永遠免費、每部影片都翻譯成功」的保證**。
-- 此版本不包含本地 Ollama、SRT/VTT 匯入、Windows 安裝程式或端到端真人使用驗收。
+- 已加入**本地 Ollama 字幕翻譯**的選用功能，但尚未在 Windows／WSL 實機驗收；仍不包含 SRT/VTT 匯入、Windows 安裝程式或端到端真人使用驗收。

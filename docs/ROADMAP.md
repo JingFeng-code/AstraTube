@@ -65,3 +65,12 @@
 - [x] Mock Ollama API 回歸測試
 - [ ] Windows / WSL 真實本地 Ollama 端到端驗收
 - [ ] 後續支援雙語字幕使用本地模型翻譯（目前仍使用第三方免費模型）
+
+
+## Phase 2c：本地 Ollama 字幕翻譯（Issue #3 第二切片）
+- [x] 在開發者模式的字幕面板選擇已安裝的 Ollama 模型
+- [x] 字幕翻譯 API 僅接受 OpenCode 免費模型或 Ollama 本地模型
+- [x] 按模型／供應商隔離翻譯快取，切換時重新讀取、保留舊譯文
+- [x] 回到一般模式後恢復預設免費模型，不自動 fallback 付費雲端
+- [x] 增加後端與前端 Mock 測試
+- [ ] Windows／WSL Ollama 實機驗收及真實影片翻譯品質檢查

@@ -1,6 +1,6 @@
-"""時間軸字幕 API：優先重用既有 YouTube / Bilibili 字幕快取。
+"""時間軸字幕 API：重用公開字幕／快取；GET 僅讀快取，POST 由使用者觸發翻譯。
 
-這個 endpoint 不向 AI 傳送資料、不翻譯，也不下載影音。
+只支援經驗證的影片 ID；不下載影音，不將 GET 字幕端點拿來呼叫 AI。
 """
 from __future__ import annotations
 
