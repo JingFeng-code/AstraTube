@@ -8,7 +8,8 @@
 Gemini 的畫面時間戳準、口說時間戳會單調漂移（實測片尾差到 +98 秒），
 所以「口說用字幕、畫面用 Gemini」兩邊各取所長，比只信任一邊都準。
 """
-from typing import Optional, TypedDict\nfrom urllib.parse import urlparse
+from typing import Optional, TypedDict
+from urllib.parse import urlparse
 
 from app.llm import gemini
 from app.services.article_fetcher import fetch_article
@@ -23,7 +24,8 @@ class Content(TypedDict):
     text: str
     is_chinese: bool
     has_timestamps: bool
-    bilibili_page: Optional[int]  # Bilibili 分 P，其他來源為 None\n    transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper；文章為 None
+    bilibili_page: Optional[int]  # Bilibili 分 P，其他來源為 None
+    transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper；文章為 None
 
 
 def _fetch_captions(video_id: str) -> Optional[tuple[str, bool]]:
