@@ -115,9 +115,14 @@ def test_invalid_batch_and_error_do_not_forge_success():
 
 
 def test_translation_error_shows_provider_reason_without_leaking_other_details():
-    from app.llm.base import ProviderError
+    from app.llm.util import http_error
+    echoed = http_error("OpenCode", 429, '{"error":"rate limited for key sk-SECRET123 on text 秘密字幕"}')
+    assert "sk-SECRET123" in str(echoed), "完整內容仍留給後端紀錄"
     cases = [
-        (ProviderError("OpenCode HTTP 429：rate limited 免費額度或請求次數已達上限"), "HTTP 429", True),
+        (echoed, "HTTP 429", True),
+        (echoed, "上限", True),
+        (echoed, "sk-SECRET123", False),
+        (echoed, "秘密字幕", False),
         (RuntimeError("internal transcript: 秘密逐字稿內容"), "秘密逐字稿", False),
     ]
     for error, needle, visible in cases:

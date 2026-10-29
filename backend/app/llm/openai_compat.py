@@ -12,7 +12,7 @@ import httpx
 from app.core import config, messages
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           ProviderError)
-from app.llm.util import connect_error_message, http_error_message, with_retry
+from app.llm.util import connect_error, http_error, with_retry
 
 # 推理型模型（deepseek-reasoner、gpt-5 thinking 等）單次摘要可能跑數分鐘，讀取逾時要給足
 _CHAT_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=60.0, pool=15.0)
@@ -112,10 +112,10 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict]) -> str:
             timeout=_CHAT_TIMEOUT,
         )
     except httpx.HTTPError as e:
-        raise ProviderError(connect_error_message(vendor.label, e))
+        raise connect_error(vendor.label, e)
 
     if resp.status_code >= 400:
-        raise ProviderError(http_error_message(vendor.label, resp.status_code, resp.text))
+        raise http_error(vendor.label, resp.status_code, resp.text)
     try:
         data = resp.json()
     except Exception:

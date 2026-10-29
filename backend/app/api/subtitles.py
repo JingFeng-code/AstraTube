@@ -13,6 +13,7 @@ from typing import Literal
 from app.transcript import bilibili, cache, captions, translation_cache, subtitle_translation, imported_subtitles
 from app.llm import opencode
 from app.llm.base import ProviderError
+from app.llm.util import public_reason
 
 router = APIRouter(prefix="/subtitles", tags=["subtitles"])
 _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -153,10 +154,12 @@ def translate_subtitles(req: TranslateRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(502, str(exc)) from exc
     except Exception as exc:
-        # 供應商金鑰與原始逐字稿不得透過錯誤訊息洩漏給瀏覽器。ProviderError 的訊息由我們自己組成
-        # （狀態碼、清理過的回應摘要與下一步建議），可以顯示，讓使用者知道是限流、斷線還是被拒。
-        kind = "本機 Ollama" if req.translation_provider.startswith("ollama:") else "免費字幕"
-        reason = f"（{str(exc)[:240]}）" if isinstance(exc, ProviderError) else ""
+        # 供應商金鑰與原始逐字稿不得透過錯誤訊息洩漏給瀏覽器：服務端回應原文可能回顯它們，
+        # 所以只顯示狀態碼與我們自己寫的建議（public_reason）。Ollama 的錯誤訊息全由本機程式產生，可以直接顯示。
+        local = req.translation_provider.startswith("ollama:")
+        kind = "本機 Ollama" if local else "免費字幕"
+        detail = public_reason(exc) or (str(exc) if local and isinstance(exc, ProviderError) else "")
+        reason = f"（{detail[:240]}）" if detail else ""
         raise HTTPException(502, f"{kind}翻譯服務暫時無法使用{reason}，請檢查連線或模型設定。") from exc
     return {
         "platform": req.platform,
