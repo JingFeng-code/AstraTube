@@ -109,10 +109,12 @@ function YouTubePlayer({ videoId, startAt, onTime }) {
   return <div className="player-host" ref={rootRef} aria-label="YouTube video player" />
 }
 
-export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, developerMode=false, localModels=[] }) {
+export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, developerMode=false, localModels=[], subtitleRevision=0 }) {
   const { t } = useI18n()
   const [cues, setCues] = useState([])
   const [subtitleError, setSubtitleError] = useState('')
+  const [subtitleSource, setSubtitleSource] = useState('')
+  const [subtitleTiming, setSubtitleTiming] = useState('')
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [time, setTime] = useState(0)
@@ -136,6 +138,8 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     setFilter('')
     setTime(0)
     setSubtitleError('')
+    setSubtitleSource('')
+    setSubtitleTiming('')
     setTranslateError('')
     setTranslating(false)
     setNextIndex(0)
@@ -145,13 +149,15 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
       if (!cancelled) {
         const data = result.cues || []
         setCues(data)
+        setSubtitleSource(result.source || 'platform')
+        setSubtitleTiming(result.timing_precision || 'seconds_estimated')
         setNextIndex(nextUntranslatedIndex(data))
       }
     }).catch(err => {
       if (!cancelled) setSubtitleError(err.message)
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [platform, videoId, page, translationProvider])
+  }, [platform, videoId, page, translationProvider, subtitleRevision])
 
   const [seek, setSeek] = useState(startAt)
   useEffect(() => { setSeek(startAt) }, [startAt.key])
@@ -203,6 +209,9 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
           <strong>{t('subtitles.title')}</strong>
           <span>{t('subtitles.translationProgress', translatedCount, cues.length)}</span>
         </div>
+        {subtitleSource === 'imported' && <p className="subtitles-hint">
+          {t('subtitles.importedTiming', subtitleTiming === 'milliseconds_original')}
+        </p>}
         {developerMode && <label className="subtitles-provider">
           <span>{t('subtitles.engine')}</span>
           <select value={translationProvider} onChange={e => setDeveloperTranslation(e.target.value)}
