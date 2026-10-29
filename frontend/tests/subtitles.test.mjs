@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {activeCueIndex, visibleCues, applyTranslations} from '../src/utils/subtitles.js'
+import {activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex} from '../src/utils/subtitles.js'
 
 const cues = [
   {start:0,end:4,text:'Hello'},
@@ -32,4 +32,18 @@ test('partial translation only updates matching subtitle index',()=>{
   assert.equal(changed[2].text,'Goodbye')
   assert.deepEqual(visibleCues(changed,'新的譯文'),[changed[1]])
   assert.equal(cues[1].translation,'歡迎')
+})
+
+test('continues after cached translations when reopening a video',()=>{
+  const data=[
+    {text:'A',translation:'甲'},
+    {text:'B',translation:'乙'},
+    {text:'C',translation:null},
+    {text:'D',translation:'丁'},
+    {text:'E',translation:null},
+  ]
+  assert.equal(nextUntranslatedIndex(data),2)
+  assert.equal(nextUntranslatedIndex(data,3),4)
+  assert.equal(nextUntranslatedIndex(data,5),5)
+  assert.equal(nextUntranslatedIndex([{text:'A',translation:'甲'}]),1)
 })

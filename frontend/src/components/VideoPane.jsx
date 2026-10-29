@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTime } from '../utils.js'
 import { getSubtitles, translateSubtitles } from '../api.js'
-import { activeCueIndex, visibleCues, applyTranslations } from '../utils/subtitles.js'
+import { activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex } from '../utils/subtitles.js'
 import { useI18n } from '../i18n/index.jsx'
 
 // 官方 YouTube IFrame API；只建立一份載入 Promise，避免重複注入 script。
@@ -135,7 +135,11 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     setShowBilingual(true)
     setLoading(true)
     getSubtitles(platform, videoId, page).then(result => {
-      if (!cancelled) setCues(result.cues || [])
+      if (!cancelled) {
+        const data = result.cues || []
+        setCues(data)
+        setNextIndex(nextUntranslatedIndex(data))
+      }
     }).catch(err => {
       if (!cancelled) setSubtitleError(err.message)
     }).finally(() => { if (!cancelled) setLoading(false) })
@@ -155,8 +159,9 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     try {
       const response = await translateSubtitles(platform, videoId, page, index, 16)
       if (sourceGeneration.current !== generation) return
-      setCues(previous => applyTranslations(previous, response.translations))
-      setNextIndex(response.next_index)
+      const updated = applyTranslations(cues, response.translations)
+      setCues(updated)
+      setNextIndex(nextUntranslatedIndex(updated, response.next_index))
       setShowBilingual(true)
     } catch (error) {
       if (sourceGeneration.current === generation) setTranslateError(error.message)

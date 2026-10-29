@@ -25,3 +25,12 @@ export function applyTranslations(cues, translations) {
   return cues.map((cue, idx) =>
     byId.has(idx) ? {...cue, translation:byId.get(idx)} : cue)
 }
+
+
+// 再次進入同一支影片時，從快取已有的翻譯之後接續；避免重頭處理。
+export function nextUntranslatedIndex(cues, start=0) {
+  if (!Array.isArray(cues)) return 0
+  const from = Number.isInteger(start) ? Math.max(0,start) : 0
+  const index = cues.findIndex((cue,i) => i >= from && !cue.translation)
+  return index === -1 ? cues.length : index
+}
