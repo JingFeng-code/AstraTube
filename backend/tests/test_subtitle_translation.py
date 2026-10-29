@@ -48,7 +48,7 @@ def test_reuses_translation_cache_without_model_call():
 
 def test_calls_only_free_model_and_preserves_ids():
     cues = [{"id": 5, "text": "Create an API"}, {"id": 6, "text": "Press Start"}]
-    response = '{"translations":[{"id":5,"text":"建立 API"},{"id":6,"text":"按下開始"}]}'
+    response = '{"translations":[{"id":6,"text":"按下開始"}]}'
     with patch.object(translation_cache, "get", side_effect=lambda text, model:
                       "建立 API" if text == "Create an API" else None), \
          patch.object(translation_cache, "put") as put, \
