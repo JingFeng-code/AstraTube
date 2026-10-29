@@ -152,7 +152,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
       <p className="pane-label">{t('video.pane')}</p>
       <div className="video-frame">
         {platform === 'youtube' ?
-          <YouTubePlayer videoId={videoId} startAt={seek} onTime={setTime} /> :
+          <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={setTime} /> :
           <iframe key={`${startAt.key}:${manualSeek.key}`} src={biliSrc} title="Bilibili"
             allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
       </div>
