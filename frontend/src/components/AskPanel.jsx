@@ -3,6 +3,7 @@ import { ask } from '../api.js'
 import useModels, { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
 import MarkdownText from './MarkdownText.jsx'
 import { useI18n } from '../i18n/index.jsx'
+import { DEFAULT_FREE_PROVIDER } from '../utils/user-mode.js'
 
 // 問答用的模型選擇（與摘要的選擇各自獨立記憶）
 const PKEY = 'ycr-ask-provider'
@@ -19,7 +20,7 @@ function saveHistory(videoId, history) {
 }
 
 // 「問影片」浮動視窗內容：以當前影片為背景知識的自由聊天室（不是卡片上的 Deep Dive 功能）。
-export default function AskPanel({ videoId }) {
+export default function AskPanel({ videoId, developerMode=false }) {
   const { t } = useI18n()
   const [history, setHistory] = useState(() => loadHistory(videoId))
   const [input, setInput] = useState('')
@@ -54,7 +55,7 @@ export default function AskPanel({ videoId }) {
     setInput('')
     setLoading(true)
     try {
-      const res = await ask({ question: q, video_id: videoId, history: prevForRequest, provider: provider || null })
+      const res = await ask({ question: q, video_id: videoId, history: prevForRequest, provider: developerMode ? (provider || null) : DEFAULT_FREE_PROVIDER })
       const assistantMsg = { role: 'assistant', content: res.answer, model: res.model_used, searched: !!res.searched }
       const withAnswer = [...withUser, assistantMsg]
       setHistory(withAnswer)
@@ -83,7 +84,7 @@ export default function AskPanel({ videoId }) {
     <div className="ask-panel ask-chat">
       <div className="ask-chat-head">
         <span className="ask-chat-hint">{videoId ? t('ask.hint') : t('ask.noVideo')}</span>
-        <select className="ask-provider" value={provider} onChange={e => setProvider(e.target.value)}
+        {developerMode && <select className="ask-provider" value={provider} onChange={e => setProvider(e.target.value)}
                 title={t('ask.providerTitle')}>
           <option value="">{t('ask.auto')}</option>
           {groups.map(p => (
@@ -91,7 +92,7 @@ export default function AskPanel({ videoId }) {
               {p.models.map(m => <option key={`${p.key}:${m}`} value={providerValue(p.key, m)}>{m}</option>)}
             </optgroup>
           ))}
-        </select>
+        </select>}
         <button className="ask-clear" onClick={clearChat} disabled={!videoId || !history.length} title={t('ask.clearTitle')}>{t('ask.clear')}</button>
       </div>
       <div className="ask-chat-list" ref={listRef}>
