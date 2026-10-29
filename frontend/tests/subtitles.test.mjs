@@ -47,3 +47,15 @@ test('continues after cached translations when reopening a video',()=>{
   assert.equal(nextUntranslatedIndex(data,5),5)
   assert.equal(nextUntranslatedIndex([{text:'A',translation:'甲'}]),1)
 })
+
+test('preserves imported millisecond start and end times',()=>{
+  const precise=[
+    {start:1.25,end:2.875,text:'Hello'},
+    {start:2.875,end:4.005,text:'world'},
+  ]
+  assert.equal(activeCueIndex(precise,1.249),-1)
+  assert.equal(activeCueIndex(precise,1.25),0)
+  assert.equal(activeCueIndex(precise,2.874),0)
+  assert.equal(activeCueIndex(precise,2.875),1)
+  assert.equal(activeCueIndex(precise,4.005),-1)
+})
