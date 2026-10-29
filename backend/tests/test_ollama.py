@@ -147,6 +147,8 @@ def test_stream_errors_are_explained():
         (FakeStream(["x"], error=httpx.ReadTimeout("slow")), "5 分鐘沒有任何輸出"),
         (FakeStream(["not json"]), "格式不正確"),
         (FakeStream(_chat_lines()), "沒有回傳文字"),
+        # 只收到部分內容、沒有 done 就結束：不可當成完整答案
+        (FakeStream(_chat_lines("前半段答案")[:-1]), "中斷"),
     ]
     for stream, expected in cases:
         with patch.object(ollama.httpx,"Client",return_value=FakeClient(stream)):

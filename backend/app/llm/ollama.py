@@ -128,6 +128,7 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
     payload = {"model": name, "messages": payload_messages, "stream": True,
                "options": {"num_ctx": context_size(payload_messages)}}
     parts: list[str] = []
+    finished = False
     try:
         with httpx.Client(timeout=_TIMEOUT, trust_env=False, follow_redirects=False) as client:
             with client.stream("POST", base_url() + "/api/chat", json=payload) as response:
@@ -146,6 +147,7 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
                     if isinstance(piece, str):
                         parts.append(piece)
                     if chunk.get("done"):
+                        finished = True
                         break
     except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
         raise ProviderError("無法連線 Ollama，請檢查本機服務是否啟動。") from exc
@@ -156,6 +158,9 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
         raise ProviderError(f"Ollama 伺服器回應 HTTP {exc.response.status_code}。") from exc
     except (httpx.HTTPError, ValueError, TypeError) as exc:
         raise ProviderError("Ollama 回應格式不正確或本機服務不可用。") from exc
+    if not finished:
+        # 連線正常結束但沒收到 done：回答被中斷（例如 Ollama 中途卸載模型），不能當成完整答案
+        raise ProviderError("Ollama 回答到一半就中斷了，請再試一次；若一直發生，請換用較小的本機模型。")
     content = "".join(parts).strip()
     if not content:
         raise ProviderError("Ollama 沒有回傳文字內容，請檢查模型是否支援文字對話。")
