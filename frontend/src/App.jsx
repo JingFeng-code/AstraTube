@@ -15,6 +15,8 @@ import useImplement from './hooks/useImplement.js'
 import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
+import { isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual } from './utils/user-mode.js'
+import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
@@ -26,6 +28,7 @@ const DVKEY='ycr-deep-visual'
 const TBKEY='ycr-topbar'
 // 影片欄／重點欄左右比例：獨立存一把 key，跨工作階段延續使用者拖過的比例
 const SPKEY='ycr-split'
+const DEVKEY='astratube-developer-mode'
 const SPLIT_MIN=20,SPLIT_MAX=80,SPLIT_DEFAULT=50
 function readPreference(key){try{return localStorage.getItem(key)}catch{return null}}
 function loadSplit(){try{const v=parseFloat(readPreference(SPKEY));return isFinite(v)&&v>=SPLIT_MIN&&v<=SPLIT_MAX?v:SPLIT_DEFAULT}catch{return SPLIT_DEFAULT}}
@@ -66,6 +69,9 @@ export default function App() {
   const { t, lang, setLang, langs } = useI18n()
   const [url,setUrl]=useState(SAVED.url||'')
   const [provider,setProvider]=useState(SAVED.provider||DEFAULT_PROVIDER)
+  const [developerMode,setDeveloperModeRaw]=useState(()=>isDeveloperModeSetting(readPreference(DEVKEY)))
+  const setDeveloperMode=enabled=>{setDeveloperModeRaw(enabled);try{localStorage.setItem(DEVKEY,enabled?'1':'0')}catch{}}
+  const activeProvider=effectiveProvider(developerMode,provider)
   const [deepVisual,setDeepVisualRaw]=useState(()=>readPreference(DVKEY)==='1')
   const setDeepVisual=v=>{setDeepVisualRaw(v);try{localStorage.setItem(DVKEY,v?'1':'0')}catch{}}
   // 頂欄收合：只反映使用者手動設定，不受 loading 等程式狀態影響
@@ -90,9 +96,9 @@ export default function App() {
     t,
   })
   const { result } = stream
-  const cardsHook = useCards(result, provider, { index: SAVED.index, deepdives: SAVED.deepdives, clips: SAVED.clips })
+  const cardsHook = useCards(result, activeProvider, { index: SAVED.index, deepdives: SAVED.deepdives, clips: SAVED.clips })
   const notes = useNotesVault(SAVED.saveOpts)
-  const implement = useImplement({ result, provider, t })
+  const implement = useImplement({ result, provider: activeProvider, t })
 
   // 摘要標題一到就當作預設檔名
   useEffect(()=>{ if(result?.title) setFilename(f=>f||result.title) },[result?.title])
@@ -115,7 +121,7 @@ export default function App() {
 
   async function handleSummarize(){
     cardsHook.resetForNewResult()
-    await stream.summarize(url,provider,deepVisual)
+    await stream.summarize(url,activeProvider,effectiveDeepVisual(developerMode,deepVisual))
   }
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
   async function onDeepDive(i){try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
@@ -124,6 +130,19 @@ export default function App() {
       const res=await notes.save({title:filename||result?.title||t('note.summary'),sourceUrl:result?.source_url||url,clips:cardsHook.clips,freeNote,t})
       showToast(res.mode==='append'?t('toast.appendedTo',res.saved_to):t('toast.savedTo',res.saved_to))
     }catch(e){showToast(e.message===t('error.pickNote')?e.message:t('toast.saveFailed',e.message),true)}
+  }
+
+  function handleExportNotes(){
+    const markdown=createNoteMarkdown({title:filename||result?.title||t('note.summary'),sourceUrl:result?.source_url||url,clips:cardsHook.clips,freeNote})
+    const blob=new Blob([markdown],{type:'text/markdown;charset=utf-8'})
+    const href=URL.createObjectURL(blob)
+    const element=document.createElement('a')
+    element.href=href
+    element.download=markdownFilename(filename||result?.title||t('note.summary'))
+    document.body.appendChild(element)
+    element.click()
+    element.remove()
+    setTimeout(()=>URL.revokeObjectURL(href),1000)
   }
 
   useEffect(()=>{function onKey(e){const tag=document.activeElement?.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;if(!cards.length)return;if(e.key==='ArrowRight')cardsHook.jumpToCard(Math.min(cardsHook.index+1,cards.length-1),true);else if(e.key==='ArrowLeft')cardsHook.jumpToCard(Math.max(cardsHook.index-1,0),true);else if(e.key.toLowerCase()==='n')clipCard(cardsHook.index)};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)})
@@ -148,7 +167,7 @@ export default function App() {
               <BrandMark/>
               <div className="brand-copy"><h1>{t('app.name')}</h1></div>
             </div>
-            <span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>
+            {developerMode&&<span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>}
             <label className="lang-switch" title={t('topbar.language')}>
               <select value={lang} onChange={e=>setLang(e.target.value)} aria-label={t('topbar.language')}>
                 {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
@@ -157,11 +176,11 @@ export default function App() {
             <button className="btn-topbar-toggle" onClick={()=>setTopbarCollapsed(true)} title={t('topbar.collapseTitle')} aria-label={t('topbar.collapseTitle')}>{t('topbar.collapse')}</button>
             <button className="btn-gear" onClick={()=>setShowSettings(true)}>{t('topbar.settings')}</button>
           </header>
-          <section className="input-row" aria-label={t('input.section')}>
+          <section className={`input-row ${!developerMode?'input-row-simple':''}`} aria-label={t('input.section')}>
             <label className="url-field">
               <input type="url" placeholder={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
             </label>
-            <label className="model-field">
+            {developerMode&&<label className="model-field">
               <select value={provider} onChange={e=>setProvider(e.target.value)}>
                 <option value="auto">{t('input.auto')}</option>
                 {providerGroups.map(p=>(
@@ -170,11 +189,11 @@ export default function App() {
                   </optgroup>
                 ))}
               </select>
-            </label>
-            <label className="deep-visual-toggle" title={t('input.deepVisualTitle')}>
+            </label>}
+            {developerMode&&<label className="deep-visual-toggle" title={t('input.deepVisualTitle')}>
               <input type="checkbox" checked={deepVisual} onChange={e=>setDeepVisual(e.target.checked)}/>
               <span><strong>{t('input.deepVisual')}</strong></span>
-            </label>
+            </label>}
             <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
           </section>
         </>
@@ -185,20 +204,20 @@ export default function App() {
       <main className="workspace" ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>
         :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p></div>
-        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo}/></>}
+        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} developerMode={developerMode}/></>}
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
       {result&&<>
         <FloatingPanel id="notes" corner="br" title={t('panel.notes')} icon="NOTE" badge={cardsHook.clips.length||null}>
-          <NotesPanel vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
+          <NotesPanel developerMode={developerMode} onExport={handleExportNotes} vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
         </FloatingPanel>
         <FloatingPanel id="ask" corner="bl" title={t('panel.ask')} icon="AI">
-          <AskPanel videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
+          <AskPanel developerMode={developerMode} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
         </FloatingPanel>
       </>}
-      {implement.open&&<ImplementModal state={implement} providers={providers} onClose={implement.close} onToast={showToast}/>}
+      {developerMode&&implement.open&&<ImplementModal state={implement} providers={providers} onClose={implement.close} onToast={showToast}/>}
       {toast&&<div className={`toast ${toast.isErr?'err':''}`}>{toast.msg}</div>}
-      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
+      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} developerMode={developerMode} onDeveloperModeChange={setDeveloperMode} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
     </>
   )
 }
