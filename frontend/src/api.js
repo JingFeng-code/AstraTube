@@ -91,7 +91,8 @@ export async function getSettings() {
   catch { return {configured:false,offline:true} }
 }
 export const saveSettings = (payload) => post('/settings', payload)
-export const getOllamaStatus = () => get('/ollama/status')
+// 不需先儲存：帶入設定畫面上目前輸入的網址（後端仍只接受本機 11434 埠）
+export const getOllamaStatus = (baseUrl) => get('/ollama/status' + (baseUrl ? '?base_url=' + encodeURIComponent(baseUrl) : ''))
 // 模型下拉選單清單；後端未就緒時回 null，由呼叫端退回靜態清單
 export async function getModels() {
   try { return await get('/models') } catch { return null }

@@ -1,5 +1,5 @@
 """GET /models：給前端下拉選單用的供應商×模型清單。"""
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.core import languages, messages
 from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
@@ -54,6 +54,9 @@ def list_models() -> dict:
 
 
 @router.get("/ollama/status")
-def ollama_status() -> dict:
-    """使用者手動點擊測試時才回報本機 Ollama 狀態（不回傳祕密）。"""
-    return ollama.connection_status()
+def ollama_status(base_url: str | None = Query(None, max_length=200)) -> dict:
+    """設定畫面讀取本機 Ollama 狀態與已安裝模型（不回傳祕密）。
+
+    base_url 讓使用者不必先儲存就能測試輸入中的網址；仍只接受本機 11434 埠。
+    """
+    return ollama.connection_status(base_url)

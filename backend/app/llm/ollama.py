@@ -52,10 +52,14 @@ def default_model() -> str:
     return (config.get("OLLAMA_MODEL") or "").strip()
 
 
-def list_models() -> list[str]:
-    """只列出該 Ollama 實例真正已安裝的模型，不生成假選項。"""
+def list_models(url: str | None = None) -> list[str]:
+    """只列出該 Ollama 實例真正已安裝的模型，不生成假選項。
+
+    url 給定時（設定畫面測試尚未儲存的網址）同樣必須通過 validate_base_url。
+    """
+    target = validate_base_url(url) if url is not None else base_url()
     with httpx.Client(timeout=httpx.Timeout(3.0), trust_env=False, follow_redirects=False) as client:
-        response = client.get(base_url() + "/api/tags")
+        response = client.get(target + "/api/tags")
         response.raise_for_status()
         data = response.json()
     raw = data.get("models", []) if isinstance(data, dict) else []
@@ -71,9 +75,14 @@ def list_models() -> list[str]:
     return names
 
 
-def connection_status() -> dict:
+def connection_status(url: str | None = None) -> dict:
+    if url is not None:
+        try:
+            validate_base_url(url)
+        except ValueError as exc:
+            return {"connected": False, "models": [], "message": str(exc)}
     try:
-        models = list_models()
+        models = list_models(url)
         return {"connected": True, "models": models, "message": (
             "連線成功，目前尚未安裝模型。請先在本機執行 ollama pull <模型名稱>。"
             if not models else "已連接到本機 Ollama。")}
