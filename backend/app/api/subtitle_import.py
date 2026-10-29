@@ -41,3 +41,18 @@ def remove_subtitles(req: TargetRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return {"removed": removed, "platform": platform, "video_id": video_id, "page": page}
+
+
+
+@router.post("/status")
+def imported_subtitles_status(req: TargetRequest) -> dict:
+    try:
+        platform, video_id, page = imported.target_from_url(req.video_url)
+        stored = imported.load(platform, video_id, page)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "exists": bool(stored), "platform": platform, "video_id": video_id, "page": page,
+        "format": stored["format"] if stored else None,
+        "cue_count": len(stored["cues"]) if stored else 0,
+    }
