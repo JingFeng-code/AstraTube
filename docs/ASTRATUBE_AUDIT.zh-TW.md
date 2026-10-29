@@ -88,7 +88,7 @@ Windows 桌面   ：Tauri v2 視窗（WebView2）→ FastAPI sidecar（PyInstall
 
 | # | 問題 | 位置／證據 | 風險 | 建議 |
 |---|---|---|---|---|
-| P2-1 | 桌面版主視窗載入 YouTube `iframe_api` 第三方腳本，該腳本與 React 同一個執行環境，理論上可呼叫 `invoke('desktop_connection')` 取得 Token | `frontend/src/components/VideoPane.jsx:33`、`tauri.conf.json` CSP `script-src https://www.youtube.com https://s.ytimg.com` | 依賴 YouTube 供應鏈不被入侵；低可能性、高影響 | 改用純 `<iframe enablejsapi=1>` ＋ `postMessage` 讀取進度，CSP 移除外部 `script-src` |
+| P2-1 | 桌面版主視窗載入 YouTube `iframe_api` 第三方腳本，該腳本與 React 同一個執行環境，理論上可呼叫 `invoke('desktop_connection')` 取得 Token | `frontend/src/components/VideoPane.jsx:33`、`tauri.conf.json` CSP `script-src https://www.youtube.com https://s.ytimg.com` | 依賴 YouTube 供應鏈不被入侵；低可能性、高影響 | ✅ 已修正：IFrame API 移到獨立來源 `astraplayer` 的 iframe，主視窗 CSP `script-src 'self'`；詳見 [DESKTOP_PLAYER_ISOLATION.zh-TW.md](DESKTOP_PLAYER_ISOLATION.zh-TW.md)（實機待驗收） |
 | P2-2 | API 金鑰以明文存在 `%APPDATA%\dev.jingfeng.astratube\settings.json` | `config.py` | 其他程式或備份可讀 | 改存 Windows Credential Manager／DPAPI |
 | P2-3 | 沒有單一實例限制；開兩次會有兩個後端 | `main.rs` 未使用 `tauri-plugin-single-instance` | 重複存檔、使用者困惑 | 加入 single-instance，第二次開啟改為聚焦既有視窗 |
 | P2-4 | 安裝檔未簽章 | `build-desktop.ps1` | SmartScreen 警告，一般使用者會被嚇退或被教導「忽略警告」 | Beta 前取得程式碼簽章（可評估 Azure Trusted Signing）|
