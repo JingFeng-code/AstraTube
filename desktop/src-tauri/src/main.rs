@@ -10,7 +10,7 @@ use uuid::Uuid;
 struct DesktopBackend {
     port: u16,
     token: String,
-    child: Mutex<CommandChild>,
+    child: Mutex<Option<CommandChild>>,
 }
 
 #[derive(Serialize)]
@@ -54,7 +54,7 @@ fn main() {
             app.manage(DesktopBackend {
                 port,
                 token,
-                child: Mutex::new(child),
+                child: Mutex::new(Some(child)),
             });
             Ok(())
         })
@@ -65,7 +65,9 @@ fn main() {
         if let tauri::RunEvent::Exit = event {
             if let Some(state) = handle.try_state::<DesktopBackend>() {
                 if let Ok(mut child) = state.child.lock() {
-                    let _ = child.kill();
+                    if let Some(process) = child.take() {
+                        let _ = process.kill();
+                    }
                 }
             }
         }
