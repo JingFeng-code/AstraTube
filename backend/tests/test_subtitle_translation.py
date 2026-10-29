@@ -123,19 +123,6 @@ def test_bounded_batch():
         pass
 
 
-if __name__ == "__main__":
-    test_translation_validates_exact_ids()
-    test_reuses_translation_cache_without_model_call()
-    test_calls_only_free_model_and_preserves_ids()
-    test_cache_persists_and_separates_models()
-    test_endpoint_binds_to_server_transcript_and_pages()
-    test_invalid_batch_and_error_do_not_forge_success()
-    test_bounded_batch()
-    test_ollama_translation_uses_own_model_and_cache()
-    test_get_cached_translation_is_provider_specific()
-    test_rejects_paid_provider_before_asking_model()
-    print("subtitle translation tests passed")
-
 def test_ollama_translation_uses_own_model_and_cache():
     """不同引擎不得共用快取，且 Ollama 失敗時不能落到雲端。"""
     from app.llm import ollama
@@ -149,9 +136,9 @@ def test_ollama_translation_uses_own_model_and_cache():
         except ValueError:
             pass
     fake = '{"translations":[{"id":0,"text":"你好"}]}'
-    with patch.object(translation_cache, "get", return_value=None) as cached, \\
-         patch.object(translation_cache, "put") as put, \\
-         patch.object(ollama, "generate", return_value=(fake, "Ollama/qwen3:4b")) as local, \\
+    with patch.object(translation_cache, "get", return_value=None) as cached, \
+         patch.object(translation_cache, "put") as put, \
+         patch.object(ollama, "generate", return_value=(fake, "Ollama/qwen3:4b")) as local, \
          patch.object(opencode, "generate") as cloud:
         result, name = subtitle_translation.translate_batch([{"id":0,"text":"Hello"}], provider=label)
     assert name == label
@@ -164,7 +151,7 @@ def test_ollama_translation_uses_own_model_and_cache():
 
 
 def test_get_cached_translation_is_provider_specific():
-    with patch.object(subtitles.captions, "fetch_transcript", return_value=("[0] Hi", False)), \\
+    with patch.object(subtitles.captions, "fetch_transcript", return_value=("[0] Hi", False)), \
          patch.object(translation_cache, "get", side_effect=lambda source, key:
                       "本地的譯文" if key == "ollama:qwen3:4b" else None):
         local = subtitles.get_subtitles("youtube", "M7lc1UVf-VE", 1, "ollama:qwen3:4b")
@@ -184,3 +171,17 @@ def test_rejects_paid_provider_before_asking_model():
         except HTTPException as exc:
             assert exc.status_code == 400
     load.assert_not_called()
+
+
+if __name__ == "__main__":
+    test_translation_validates_exact_ids()
+    test_reuses_translation_cache_without_model_call()
+    test_calls_only_free_model_and_preserves_ids()
+    test_cache_persists_and_separates_models()
+    test_endpoint_binds_to_server_transcript_and_pages()
+    test_invalid_batch_and_error_do_not_forge_success()
+    test_bounded_batch()
+    test_ollama_translation_uses_own_model_and_cache()
+    test_get_cached_translation_is_provider_specific()
+    test_rejects_paid_provider_before_asking_model()
+    print("subtitle translation tests passed")
