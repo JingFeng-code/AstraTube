@@ -435,3 +435,7 @@ button:disabled{cursor:not-allowed}
 .subtitles-bilingual-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-soft);cursor:pointer}
 .subtitles-bilingual-toggle input{accent-color:var(--accent);width:15px;height:15px}
 .subtitle-translation{color:var(--text);font-size:13px}
+
+/* 開發者模式：測試本地 Ollama 連線，不在一般模式暴露技術欄位。 */
+.settings-ollama-check{display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.settings-ollama-check p{margin:0;flex:1;min-width:180px}

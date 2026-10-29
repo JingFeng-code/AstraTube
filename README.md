@@ -24,6 +24,10 @@ AstraTube 現在預設使用**一般使用者模式**：不需要先設定 API �
 
 在「設定」內切換**開發者模式**，即可顯示模型選擇、深視覺、API 金鑰、Obsidian 與 Codex／Claude Code 進階選項。切換僅改變本機介面顯示，並非後端權限控制。完整說明：[使用者模式指南](docs/USER_MODES.zh-TW.md)。
 
+## Ollama（開發者模式，先期整合）
+
+在同一台電腦啟動 Ollama，於 **設定 → 開發者模式 → Ollama 本地 AI** 設定本機網址及模型。按「測試已儲存的 Ollama 連線」確認狀態，並從模型選單選擇 `ollama:<模型>`，即可使用本地模型產生摘要、知識卡與影片問答。本功能不需要 API Key，且**不會自動改用付費雲端模型**。目前限定同環境的回環介面 11434 埠；**Codespaces 無法直接連線到你 Windows 電腦的 Ollama**。字幕逐句翻譯仍是另外的免費雲端模型流程。詳見 [Ollama 開發指南](docs/OLLAMA.zh-TW.md)。
+
 ## 快速開始：GitHub Codespaces
 
 1. 在 GitHub 的 **Code → Codespaces → Create codespace** 建立開發環境。

@@ -19,6 +19,10 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
   const [folder, setFolder] = useState(state?.obsidian_notes_folder || 'Youtube Card Reader')
   const [outputLanguage, setOutputLanguage] = useState(state?.output_language || 'zh-Hant')
+  const [ollamaUrl, setOllamaUrl] = useState(state?.ollama_base_url || 'http://127.0.0.1:11434')
+  const [ollamaModel, setOllamaModel] = useState(state?.ollama_model || '')
+  const [ollamaStatus, setOllamaStatus] = useState(null)
+  const [checkingOllama, setCheckingOllama] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -32,7 +36,12 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
       // 金鑰：留空代表「維持原本設定」，只送有輸入的
       ...(developerMode ? Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])) : {}),
       // 這些總是送出（清空即代表停用）
-      ...(developerMode ? {obsidian_vault_path: vault.trim(), obsidian_notes_folder: folder.trim() || 'Youtube Card Reader'} : {}),
+      ...(developerMode ? {
+        obsidian_vault_path: vault.trim(),
+        obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
+        ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
+        ollama_model: ollamaModel.trim(),
+      } : {}),
       output_language: outputLanguage,
     }
     setSaving(true)
@@ -43,6 +52,18 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
       setErr(t('settings.saveFailed', e.message))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function checkOllama() {
+    setCheckingOllama(true)
+    setOllamaStatus(null)
+    try {
+      setOllamaStatus(await api.getOllamaStatus())
+    } catch {
+      setOllamaStatus({connected:false,models:[],message:t('settings.ollamaUnavailable')})
+    } finally {
+      setCheckingOllama(false)
     }
   }
 
@@ -88,6 +109,28 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
           </label>
 
           {developerMode && <>
+          <div className="settings-divider"><span>{t('settings.ollamaSection')}</span></div>
+          <label className="settings-field">
+            <span className="settings-label">{t('settings.ollamaUrl')}</span>
+            <input type="text" value={ollamaUrl} onChange={e=>setOllamaUrl(e.target.value)}
+                   autoComplete="off" spellCheck={false} placeholder="http://127.0.0.1:11434"/>
+            <span className="settings-hint">{t('settings.ollamaUrlHint')}</span>
+          </label>
+          <label className="settings-field">
+            <span className="settings-label">{t('settings.ollamaModel')}</span>
+            <input type="text" value={ollamaModel} onChange={e=>setOllamaModel(e.target.value)}
+                   autoComplete="off" spellCheck={false} placeholder={t('settings.ollamaModelPlaceholder')}/>
+            <span className="settings-hint">{t('settings.ollamaModelHint')}</span>
+          </label>
+          <div className="settings-ollama-check">
+            <button type="button" className="settings-cancel" onClick={checkOllama} disabled={checkingOllama}>
+              {checkingOllama?t('settings.ollamaChecking'):t('settings.ollamaCheck')}
+            </button>
+            {ollamaStatus && <p className={ollamaStatus.connected?'settings-hint':'settings-err'} role="status">
+              {ollamaStatus.message}{ollamaStatus.models?.length?' ('+ollamaStatus.models.join(', ')+')':''}
+            </p>}
+          </div>
+          <p className="settings-hint">{t('settings.ollamaCheckHint')}</p>
           <div className="settings-divider"><span>{t('settings.engines')}</span></div>
           {ENGINES.map(({ name, field, multiline }) => {
             const already = !!state?.[`${name}_set`]
