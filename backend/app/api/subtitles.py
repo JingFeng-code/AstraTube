@@ -56,6 +56,7 @@ def get_subtitles(
     platform: str = Query(..., pattern="^(youtube|bilibili)$"),
     video_id: str = Query(..., max_length=20),
     page: int = Query(1, ge=1, le=1000),
+    translation_provider: str = "opencode",
 ) -> dict:
     """只接受影片識別碼；不接受任意外部 URL，以免變成網路代理。"""
     if platform == "youtube":
@@ -81,14 +82,18 @@ def get_subtitles(
     if not cues:
         raise HTTPException(404, "逐字稿沒有可顯示的時間戳字幕。")
     # 讀取本機已有的譯文，不觸發 AI API；切換影片或重新開啟時不需重複付費或運算。
-    model = opencode.DEFAULT_FREE_MODEL
+    try:
+        _, _, cache_key = subtitle_translation.resolve_provider(translation_provider)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     translated_count = 0
     for cue in cues:
-        cue["translation"] = translation_cache.get(cue["text"], model)
+        cue["translation"] = translation_cache.get(cue["text"], cache_key)
         if cue["translation"]:
             translated_count += 1
     return {
         "translated_count": translated_count,
+        "translation_provider": translation_provider,
         "platform": platform,
         "video_id": video_id,
         "page": page,
@@ -107,12 +112,17 @@ class TranslateRequest(BaseModel):
     page: int = Field(default=1, ge=1, le=1000)
     start_index: int = Field(default=0, ge=0, le=5999)
     batch_size: int = Field(default=16, ge=1, le=16)
+    translation_provider: str = Field(default="opencode", min_length=1, max_length=140)
 
 
 @router.post("/translate")
 def translate_subtitles(req: TranslateRequest) -> dict:
     """使用者按下翻譯後才執行。原文由伺服器取得，防止任意文字被拿來消耗模型。"""
-    source = get_subtitles(req.platform, req.video_id, req.page)
+    try:
+        subtitle_translation.resolve_provider(req.translation_provider)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    source = get_subtitles(req.platform, req.video_id, req.page, req.translation_provider)
     cues = source["cues"]
     if req.start_index >= len(cues):
         raise HTTPException(400, "翻譯位置超出影片字幕範圍。")
@@ -120,12 +130,14 @@ def translate_subtitles(req: TranslateRequest) -> dict:
     indexed = [{"id": req.start_index + index, "text": cue["text"]}
                for index, cue in enumerate(selected)]
     try:
-        translations, model = subtitle_translation.translate_batch(indexed)
+        translations, model = subtitle_translation.translate_batch(
+            indexed, provider=req.translation_provider)
     except ValueError as exc:
         raise HTTPException(502, str(exc)) from exc
     except Exception as exc:
         # 供應商金鑰、HTTP 回應或原始逐字稿不得透過錯誤訊息洩漏給瀏覽器。
-        raise HTTPException(502, "免費字幕翻譯服務暫時無法使用，請稍後重試。") from exc
+        kind = "本機 Ollama" if req.translation_provider.startswith("ollama:") else "免費字幕"
+        raise HTTPException(502, f"{kind}翻譯服務暫時無法使用，請檢查連線或模型設定。") from exc
     return {
         "platform": req.platform,
         "video_id": req.video_id,

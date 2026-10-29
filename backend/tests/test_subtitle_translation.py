@@ -86,10 +86,10 @@ def test_endpoint_binds_to_server_transcript_and_pages():
             platform="bilibili", video_id="BV1B7411m7LV", page=2,
             start_index=1, batch_size=2
         ))
-    get_source.assert_called_once_with("bilibili", "BV1B7411m7LV", 2)
+    get_source.assert_called_once_with("bilibili", "BV1B7411m7LV", 2, "opencode")
     translate.assert_called_once_with([
         {"id": 1, "text": "second"}, {"id": 2, "text": "third"},
-    ])
+    ], provider="opencode")
     assert result["next_index"] == 3
     assert result["translations"][0]["id"] == 1
 
@@ -131,4 +131,56 @@ if __name__ == "__main__":
     test_endpoint_binds_to_server_transcript_and_pages()
     test_invalid_batch_and_error_do_not_forge_success()
     test_bounded_batch()
+    test_ollama_translation_uses_own_model_and_cache()
+    test_get_cached_translation_is_provider_specific()
+    test_rejects_paid_provider_before_asking_model()
     print("subtitle translation tests passed")
+
+def test_ollama_translation_uses_own_model_and_cache():
+    """不同引擎不得共用快取，且 Ollama 失敗時不能落到雲端。"""
+    from app.llm import ollama
+    label = "ollama:qwen3:4b"
+    assert subtitle_translation.resolve_provider(label) == ("ollama", "qwen3:4b", label)
+    assert subtitle_translation.resolve_provider("opencode")[2] == opencode.DEFAULT_FREE_MODEL
+    for invalid in ("", "openai:gpt-4.1", "gemini", "ollama:", "ollama:qwen3:4b-cloud"):
+        try:
+            subtitle_translation.resolve_provider(invalid)
+            assert False, "Invalid translation provider should fail: " + invalid
+        except ValueError:
+            pass
+    fake = '{"translations":[{"id":0,"text":"你好"}]}'
+    with patch.object(translation_cache, "get", return_value=None) as cached, \\
+         patch.object(translation_cache, "put") as put, \\
+         patch.object(ollama, "generate", return_value=(fake, "Ollama/qwen3:4b")) as local, \\
+         patch.object(opencode, "generate") as cloud:
+        result, name = subtitle_translation.translate_batch([{"id":0,"text":"Hello"}], provider=label)
+    assert name == label
+    assert result == [{"id":0,"translation":"你好"}]
+    cached.assert_called_once_with("Hello", label)
+    put.assert_called_once_with("Hello", label, "你好")
+    local.assert_called_once()
+    assert local.call_args.kwargs["model"] == "qwen3:4b"
+    cloud.assert_not_called()
+
+
+def test_get_cached_translation_is_provider_specific():
+    with patch.object(subtitles.captions, "fetch_transcript", return_value=("[0] Hi", False)), \\
+         patch.object(translation_cache, "get", side_effect=lambda source, key:
+                      "本地的譯文" if key == "ollama:qwen3:4b" else None):
+        local = subtitles.get_subtitles("youtube", "M7lc1UVf-VE", 1, "ollama:qwen3:4b")
+        free = subtitles.get_subtitles("youtube", "M7lc1UVf-VE", 1, "opencode")
+    assert local["cues"][0]["translation"] == "本地的譯文"
+    assert free["cues"][0]["translation"] is None
+    assert local["translation_status"] == "complete"
+
+
+def test_rejects_paid_provider_before_asking_model():
+    with patch.object(subtitles, "get_subtitles") as load:
+        try:
+            subtitles.translate_subtitles(subtitles.TranslateRequest(
+                platform="youtube", video_id="M7lc1UVf-VE", translation_provider="openai:gpt-4.1"
+            ))
+            assert False
+        except HTTPException as exc:
+            assert exc.status_code == 400
+    load.assert_not_called()

@@ -1,4 +1,4 @@
-"""只在使用者要求時翻譯字幕，固定使用免費模型，不自動備援到付費 API。"""
+"""字幕翻譯服務：明確選擇 OpenCode 免費模型或 Ollama 本地模型，不進付費鏈。"""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,7 @@ from typing import Any
 
 from json_repair import repair_json
 
-from app.llm import opencode
+from app.llm import opencode, ollama
 from app.transcript import translation_cache
 
 MAX_BATCH = 16
@@ -50,14 +50,29 @@ def _validated_json(raw: str, expected_ids: set[int]) -> dict[int, str]:
     return values
 
 
-def translate_batch(cues: list[dict]) -> tuple[list[dict], str]:
+def resolve_provider(provider: str = "opencode") -> tuple[str, str, str]:
+    """只允許預設免費模型或指定本地 Ollama；不接收付費 Provider。
+
+    cache_key 必須隔離兩個供應商；既有 OpenCode 快取維持原鍵向後相容。
+    """
+    if provider == "opencode":
+        model = opencode.DEFAULT_FREE_MODEL
+        return "opencode", model, model
+    if provider.startswith("ollama:"):
+        raw = provider[len("ollama:"):]
+        model = ollama.validate_model(raw)
+        return "ollama", model, f"ollama:{model}"
+    raise ValueError("字幕翻譯僅支援預設免費模型或明確指定的 Ollama 本地模型。")
+
+
+def translate_batch(cues: list[dict], provider: str = "opencode") -> tuple[list[dict], str]:
     """接收已由伺服器驗證的逐字稿片段，回傳對應索引的翻譯清單。
 
     第一次僅翻譯尚未快取的字幕；成功後才批次寫入快取。
     """
     if not 1 <= len(cues) <= MAX_BATCH:
         raise ValueError("每次只能翻譯 1 至 16 句字幕。")
-    model = opencode.DEFAULT_FREE_MODEL
+    engine, model, cache_key = resolve_provider(provider)
     result: dict[int, str] = {}
     missing: list[dict] = []
     total_chars = 0
@@ -66,7 +81,7 @@ def translate_batch(cues: list[dict]) -> tuple[list[dict], str]:
         if not isinstance(source, str) or not source.strip() or len(source) > MAX_CHARS_PER_CUE:
             raise ValueError("字幕內容超過單句限制或為空。")
         total_chars += len(source)
-        cached = translation_cache.get(source, model)
+        cached = translation_cache.get(source, cache_key)
         if cached:
             result[idx] = cached
         else:
@@ -77,11 +92,13 @@ def translate_batch(cues: list[dict]) -> tuple[list[dict], str]:
         prompt = "依照 id 逐句翻譯，僅回傳 JSON：\n" + json.dumps(
             {"cues": missing}, ensure_ascii=False, separators=(",", ":")
         )
-        response, _ = opencode.generate(
-            prompt, _SYSTEM, model=model, tries=2,
-        )
+        if engine == "ollama":
+            # 僅發至同環境的 loopback Ollama；沒有跨供應商的自動 fallback。
+            response, _ = ollama.generate(prompt, _SYSTEM, model=model)
+        else:
+            response, _ = opencode.generate(prompt, _SYSTEM, model=model, tries=2)
         translated = _validated_json(response, {r["id"] for r in missing})
         for item in missing:
-            translation_cache.put(item["text"], model, translated[item["id"]])
+            translation_cache.put(item["text"], cache_key, translated[item["id"]])
         result.update(translated)
-    return ([{"id": row["id"], "translation": result[row["id"]]} for row in cues], model)
+    return ([{"id": row["id"], "translation": result[row["id"]]} for row in cues], cache_key)
