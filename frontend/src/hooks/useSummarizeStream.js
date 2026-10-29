@@ -15,6 +15,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
     setLoading(true); setError(''); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
     const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
     let segsDone = 0
+    let firstSegmentError = ''
     try {
       await api.summarizeStream(u, provider, deepVisual, ev => {
         if (ev.type === 'progress') {
@@ -39,6 +40,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
           setResult({ ...draft }); setLoading(false)
           setProgress(p => ({ ...p, stage: 'generate', state: 'next', completed: segsDone, total: draft.segments, startedAt }))
         } else if (ev.type === 'seg_error') {
+          if (!firstSegmentError && typeof ev.error === 'string') firstSegmentError = ev.error.trim().slice(0, 220)
           segsDone++; setProgress(p => ({ ...p, stage: 'generate', state: 'next', completed: segsDone, total: draft.segments, startedAt })); onSegError?.(ev)
         } else if (ev.type === 'fatal') {
           throw new Error(ev.error)
@@ -48,7 +50,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
           setResult({ ...draft }); setProgress(null)
         }
       })
-      if (!draft.cards.length) setError(t('error.noCards'))
+      if (!draft.cards.length) setError(firstSegmentError ? `${t('error.noCards')} · ${firstSegmentError}` : t('error.noCards'))
     } catch (e) {
       setError(t('error.generate', e.message))
     } finally {
