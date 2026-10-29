@@ -3,6 +3,7 @@ import { fmtTime } from '../utils.js'
 import { getSubtitles, translateSubtitles } from '../api.js'
 import { activeCueIndex, visibleCues, applyTranslations, nextUntranslatedIndex } from '../utils/subtitles.js'
 import { useI18n } from '../i18n/index.jsx'
+import { effectiveSubtitleTranslationProvider } from '../utils/subtitle-provider.js'
 
 // 官方 YouTube IFrame API；只建立一份載入 Promise，避免重複注入 script。
 let ytApiPromise
@@ -123,8 +124,9 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   const [developerTranslation, setDeveloperTranslation] = useState('opencode')
   // 回到一般模式就只使用免費模型；本地模型若不存在也退回預設，
   // 切換模式時不刪掉開發者上次選擇。
-  const translationProvider = developerMode && developerTranslation.startsWith('ollama:')
-    && localModels.includes(developerTranslation.slice(7)) ? developerTranslation : 'opencode'
+  const translationProvider = effectiveSubtitleTranslationProvider(
+    developerMode, developerTranslation, localModels
+  )
   const sourceGeneration = useRef(0)
 
   useEffect(() => {
