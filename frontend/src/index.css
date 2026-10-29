@@ -411,3 +411,20 @@ button:disabled{cursor:not-allowed}
 .settings-mode-copy small{color:var(--text-soft);font-size:12px;line-height:1.5}
 .settings-mode-toggle input{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0}
 @media(max-width:600px){.input-row.input-row-simple{grid-template-columns:1fr}.input-row.input-row-simple .btn-go{grid-column:1;grid-row:2;width:100%}}
+
+/* 影片字幕：有時間戳、支援搜尋和點擊跳轉；不改動既有左右分欄。 */
+.player-host,.player-host iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.subtitles-panel{margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface);min-width:0}
+.subtitles-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.subtitles-head strong{color:var(--text)}
+.subtitles-head span{font-size:11px;color:var(--text-faint);text-align:right}
+.subtitles-search{margin-top:8px;width:100%;height:36px;border:1px solid var(--border);border-radius:var(--radius-control);color:var(--text);background:var(--surface-2);padding:5px 9px}
+.subtitles-list{display:flex;flex-direction:column;overflow-y:auto;max-height:240px;margin-top:9px;gap:4px}
+.subtitle-cue{display:flex;gap:12px;text-align:left;align-items:baseline;width:100%;padding:8px 9px;border:1px solid transparent;border-radius:var(--radius-small);background:transparent;color:var(--text-soft);font-size:13px;line-height:1.6}
+.subtitle-cue:hover{background:var(--surface-2)}
+.subtitle-cue.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
+.subtitle-time{min-width:42px;font:650 12px var(--mono);color:var(--accent)}
+.subtitle-words{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+.subtitle-translation{color:var(--text-faint)}
+.subtitles-hint{margin:10px 2px 2px;color:var(--text-faint);font-size:12px;line-height:1.5}
+@media(max-width:600px){.subtitles-head{align-items:flex-start;flex-direction:column}.subtitles-head span{text-align:left}}

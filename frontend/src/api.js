@@ -50,6 +50,18 @@ export const revealOutput = (path) => post('/implement/reveal', {path})
 export const readOutputFile = (path) => get('/implement/file?path=' + encodeURIComponent(path))
 // 自由聊天室：以整支影片為背景知識問答。history 為目前為止的對話（不含本次 question）
 export const ask = (payload) => post('/ask', payload)
+// 僅回傳可公開取得的字幕時間軸；翻譯會在後續獨立功能提供。
+export async function getSubtitles(platform, videoId, page=1) {
+  const path = '/subtitles?platform='+encodeURIComponent(platform)
+    +'&video_id='+encodeURIComponent(videoId)
+    +'&page='+encodeURIComponent(page)
+  const res = await fetch(BASE+path)
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new Error(data?.detail || 'HTTP '+res.status)
+  }
+  return res.json()
+}
 export const saveNote  = (payload) => post('/notes/save', payload)
 export async function notesStatus() {
   try { const r=await fetch(BASE+'/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
