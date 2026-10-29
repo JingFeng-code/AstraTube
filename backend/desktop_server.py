@@ -24,7 +24,8 @@ def main() -> None:
     data_path.mkdir(parents=True, exist_ok=True)
     # Import app only after the session/data environment is available.
     import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=port, reload=False,
+    from app.main import app as application
+    uvicorn.run(application, host="127.0.0.1", port=port, reload=False,
                 workers=1, access_log=False, log_level="warning")
 
 
