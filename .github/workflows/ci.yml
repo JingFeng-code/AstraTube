@@ -35,6 +35,7 @@ jobs:
           python tests/test_content_type.py
           python tests/test_implement.py
           python tests/test_messages.py
+          python tests/test_bilibili.py
 
   frontend:
     name: Frontend build

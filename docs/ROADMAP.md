@@ -26,3 +26,12 @@
 
 - [ ] 只在有合法來源且原生轉錄不足時，整合 VideoToNo HTTP Adapter
 - [ ] 不直接合併兩套後端，保留可替換的 TranscriptSegment 契約
+
+
+## Phase 1a：Bilibili（Issue #5）
+- [x] 公開 BV 影片／分 P 識別
+- [x] 匿名公開字幕擷取 + 快取
+- [x] 繁中知識卡與 AI 問答
+- [x] 官方嵌入播放器與時間戳跳轉
+- [x] 模擬 API 的單元測試
+- [ ] Codespaces 實際 B 站連線／字幕驗收

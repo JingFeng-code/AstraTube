@@ -9,10 +9,11 @@ Gemini 的畫面時間戳準、口說時間戳會單調漂移（實測片尾差�
 所以「口說用字幕、畫面用 Gemini」兩邊各取所長，比只信任一邊都準。
 """
 from typing import Optional, TypedDict
+from urllib.parse import urlparse
 
 from app.llm import gemini
 from app.services.article_fetcher import fetch_article
-from app.transcript import captions, deepsrt, whisper_local
+from app.transcript import bilibili, captions, deepsrt, whisper_local
 
 
 class Content(TypedDict):
@@ -23,6 +24,7 @@ class Content(TypedDict):
     text: str
     is_chinese: bool
     has_timestamps: bool
+    bilibili_page: Optional[int]  # Bilibili 分 P，其他來源為 None
     transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper；文章為 None
 
 
@@ -80,6 +82,19 @@ def _pack(kind: str, video_id: Optional[str], text: str, is_chinese: bool,
 
 def route_content(url: str, deep_visual: bool = False) -> Content:
     """依網址型態取得內容。取不到會拋出例外（ValueError 代表使用者輸入問題）。"""
+    bili = bilibili.parse_video_url(url)
+    if bili:
+        if deep_visual:
+            raise ValueError("Bilibili 尚不支援深視覺分析，請關閉「讀取畫面」後重試。")
+        bvid, page = bili
+        text, is_chinese = bilibili.fetch_transcript(bvid, page)
+        result = _pack("bilibili", bvid, text, is_chinese, "bilibili_captions")
+        result["bilibili_page"] = page
+        return result
+
+    if urlparse((url or "").strip()).hostname == "b23.tv":
+        raise ValueError("請先打開 B 站短連結，再貼上完整的 bilibili.com/video/BV... 網址。")
+
     video_id = captions.extract_video_id(url)
     if video_id:
         return _youtube(url, video_id, deep_visual)

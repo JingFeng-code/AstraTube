@@ -1,5 +1,6 @@
 """「問模型」端點：以影片逐字稿為背景知識的自由對話（Gemini 可搭 Google 搜尋）。"""
 from typing import Optional
+import re
 
 from fastapi import APIRouter, HTTPException
 
@@ -10,7 +11,7 @@ from app.llm import router as llm_router
 from app.llm.base import NotConfiguredError, RefusalError
 from app.models.schemas import AskRequest
 from app.prompts.ask import ask_system
-from app.transcript import cache, captions
+from app.transcript import cache, captions, bilibili
 
 router = APIRouter(tags=["ask"])
 
@@ -22,6 +23,16 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     """依序從 DeepSRT 快取 → whisper 快取 → 線上字幕撈逐字稿。"""
     if not video_id:
         return None
+    match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)
+    if match:
+        bvid, page = match.group(1), int(match.group(2))
+        cached = cache.get(bilibili.transcript_cache_key(bvid, page))
+        if cached:
+            return cached[0]
+        try:
+            return bilibili.fetch_transcript(bvid, page)[0]
+        except ValueError:
+            return None
     for key in (f"deepsrt_v1:{video_id}", video_id):
         hit = cache.get(key)
         if hit and hit[0].strip():

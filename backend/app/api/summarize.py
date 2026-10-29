@@ -230,7 +230,9 @@ def summarize(req: SummarizeRequest) -> dict:
 
     return {"title": title or messages.t("summarize.untitled"),
             "source_type": content["type"],
-            "source_url": req.url, "youtube_video_id": content.get("video_id"),
+            "source_url": req.url, "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
+            "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
+            "bilibili_page": content.get("bilibili_page"),
             "transcript_source": content.get("transcript_source"),
             "content_type": _pick_content_type(content_types),
             "cards": all_cards, "model_used": "、".join(models_used),
@@ -265,7 +267,9 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
         multi = len(chunks) > 1
         workers = llm_router.parallel_workers(req.provider, len(chunks))
         yield line({"type": "meta", "source_type": content["type"], "source_url": req.url,
-                    "youtube_video_id": content.get("video_id"),
+                    "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
+            "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
+            "bilibili_page": content.get("bilibili_page"),
                     "transcript_source": content.get("transcript_source"),
                     "segments": len(chunks), "workers": workers})
         title: str | None = None
