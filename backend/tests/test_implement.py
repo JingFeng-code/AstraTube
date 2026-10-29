@@ -100,9 +100,11 @@ def test_clean_env_drops_agent_vars_but_keeps_identity():
     dirty = {"CLAUDECODE": "1", "CLAUDE_CODE_ENTRYPOINT": "cli",
              "ANTHROPIC_BASE_URL": "http://proxy.local", "ANTHROPIC_API_KEY": "sk-x",
              "OPENAI_API_KEY": "sk-y", "OPENAI_BASE_URL": "http://proxy.local"}
-    saved = {k: os.environ.get(k) for k in dirty}
+    # 容器或 CI 不一定有 USER／LOGNAME；這裡要驗的是「有就要傳下去」，所以先補上。
+    identity = {k: os.environ.get(k) or "astratube-test" for k in ("HOME", "USER", "LOGNAME")}
+    saved = {k: os.environ.get(k) for k in {**dirty, **identity}}
     try:
-        os.environ.update(dirty)
+        os.environ.update({**dirty, **identity})
         env = agent_cli.clean_env()
         for leaked in dirty:
             assert leaked not in env, f"{leaked} 不該傳給子行程"

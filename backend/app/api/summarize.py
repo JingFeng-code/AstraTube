@@ -88,10 +88,21 @@ def _parse_cards(raw: str, language: str) -> dict:
     return data
 
 
+def _allows_cloud_transcription(provider: str | None) -> bool:
+    """只有自動模式或明確選 Gemini 時，字幕失敗才可自動改用 Gemini 雲端轉錄。
+
+    一般模式固定送出 OpenCode 免費模型、開發者選 Ollama 時，都不能因為設定裡剛好有
+    Gemini 金鑰，就默默把影片交給雲端並消耗額度。
+    """
+    kind, _ = llm_router.parse(provider)
+    return kind in (llm_router.AUTO, llm_router.GEMINI)
+
+
 def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
     """擷取內容並切段，回傳 (內容, 片段列表, 是否多段)。"""
     try:
-        content = route_content(req.url, deep_visual=req.deep_visual)
+        content = route_content(req.url, deep_visual=req.deep_visual,
+                                    allow_cloud_fallback=_allows_cloud_transcription(req.provider))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
@@ -253,7 +264,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
     def gen() -> Iterator[str]:
         yield line({"type": "progress", "stage": "source", "completed": 0, "total": 0})
         try:
-            content = route_content(req.url, deep_visual=req.deep_visual)
+            content = route_content(req.url, deep_visual=req.deep_visual,
+                                    allow_cloud_fallback=_allows_cloud_transcription(req.provider))
             has_ts = content.get("has_timestamps") or content["type"] == "youtube"
             chunks = chunk_content(content["text"], bool(has_ts))
         except ValueError as e:

@@ -237,6 +237,13 @@ MESSAGES: dict[str, dict[str, str]] = {
     },
 
     # ── 本機轉寫 ────────────────────────────────────────────
+    "whisper.unavailable_desktop": {
+        "zh-Hant": "這支影片沒有可讀取的公開字幕，而桌面測試版尚未內建本機語音轉錄。"
+                   "請改用你有權使用的 SRT／VTT 字幕檔匯入後再分析。",
+        "en": "This video has no readable public captions, and the desktop preview does not "
+              "include local speech-to-text yet. Import an SRT/VTT file you are allowed to use, "
+              "then analyze again.",
+    },
     "whisper.download_failed": {
         "zh-Hant": "無法下載此影片的音訊（可能不支援、需登入或已下架）：{detail}",
         "en": "Could not download this video's audio — it may be unsupported, "

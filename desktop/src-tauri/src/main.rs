@@ -48,7 +48,10 @@ fn main() {
                 .env("ASTRA_DESKTOP_TOKEN", &token)
                 .env("ASTRA_DESKTOP_PORT", port.to_string())
                 .env("ASTRA_DESKTOP_DATA_DIR", data_dir.to_string_lossy().to_string())
-                .env("AUTO_RUN_CLI", "0");
+                .env("AUTO_RUN_CLI", "0")
+                // 本程式當掉、被強制結束，或 PyInstaller onefile 只停掉外層行程時，
+                // Sidecar 會依此 PID 發現桌面程式已不在，並自行結束。
+                .env("ASTRA_DESKTOP_PARENT_PID", std::process::id().to_string());
 
             let (_events, child) = command.spawn()?;
             app.manage(DesktopBackend {
