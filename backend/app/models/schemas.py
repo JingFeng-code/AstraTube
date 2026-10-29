@@ -81,6 +81,8 @@ class SettingsUpdate(BaseModel):
     deepseek_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    ollama_base_url: Optional[str] = None
+    ollama_model: Optional[str] = None
     output_language: Optional[str] = None
     ui_language: Optional[str] = None      # 介面語言（zh-Hant／en），也決定後端錯誤訊息的語言
     obsidian_vault_path: Optional[str] = None

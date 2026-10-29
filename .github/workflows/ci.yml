@@ -32,6 +32,7 @@ jobs:
           python tests/test_deepsrt.py
           python tests/test_progress_stream.py
           python tests/test_providers.py
+          python tests/test_ollama.py
           python tests/test_content_type.py
           python tests/test_implement.py
           python tests/test_messages.py

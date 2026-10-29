@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 
 from app.core import languages, messages
-from app.llm import anthropic_api, gemini, opencode, openai_compat
+from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 
 router = APIRouter(tags=["models"])
 
@@ -21,6 +21,8 @@ def list_models() -> dict:
     openai_models, openai_source = openai_compat.list_models(openai_compat.OPENAI)
     claude_models, claude_source = anthropic_api.list_models()
 
+    local = ollama.connection_status()
+    # 不把尚未安裝的模型顯示為可用選項。
     return {
         # 舊欄位保留，讓舊版前端不會整個壞掉
         "gemini": [gemini.MODEL],
@@ -28,6 +30,9 @@ def list_models() -> dict:
         "source": free_source,
         "default": f"opencode:{opencode.DEFAULT_FREE_MODEL}",
         "providers": {
+            "ollama": {"label": "Ollama（本機）", "models": local["models"],
+                       "source": "local", "configured": local["connected"] and bool(local["models"]),
+                       "free": True, "connected": local["connected"]},
             "opencode": {"label": messages.t("provider.opencode_label"), "models": free,
                          "source": free_source, "configured": True, "free": True},
             "gemini": {"label": "Google Gemini", "models": [gemini.MODEL],
@@ -46,3 +51,9 @@ def list_models() -> dict:
         },
         "languages": languages.codes(),
     }
+
+
+@router.get("/ollama/status")
+def ollama_status() -> dict:
+    """使用者手動點擊測試時才回報本機 Ollama 狀態（不回傳祕密）。"""
+    return ollama.connection_status()
