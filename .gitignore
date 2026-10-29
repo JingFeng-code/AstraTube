@@ -24,3 +24,10 @@ Thumbs.db
 
 # Claude Code 本機開發設定（dev server 啟動方式，非專案必要）
 .claude/
+
+# Local desktop bundling files
+/backend/build/
+/backend/dist/
+/desktop/src-tauri/target/
+/desktop/src-tauri/binaries/*.exe
+/desktop/src-tauri/binaries/*-pc-windows-msvc
