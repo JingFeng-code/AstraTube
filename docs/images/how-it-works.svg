@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" width="1200" height="640" role="img" aria-label="How a transcript is obtained: a three layer waterfall, and how read screen mode merges the model with the subtitles">
+  <title>Transcript waterfall</title>
+  <defs>
+    <style>
+      .bg    { fill: #101010; }
+      .panel { fill: #171717; stroke: #2b2b2b; stroke-width: 1; }
+      .panel-accent { fill: #1b1414; stroke: #4a2626; stroke-width: 1; }
+      .h1    { fill: #f2f2f2; font: 600 30px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .h2    { fill: #ef4747; font: 600 15px "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: 1.4px; }
+      .box-t { fill: #f2f2f2; font: 600 19px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .box-s { fill: #9a9aa0; font: 400 14px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .num   { fill: #6b6b70; font: 600 13px "SFMono-Regular", Menlo, Consolas, monospace; }
+      .fall  { fill: #7a7a80; font: 400 13px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .lead  { fill: #f2f2f2; font: 600 20px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .body  { fill: #b6b6ba; font: 400 15px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .accent{ fill: #ef4747; }
+      .arrow { stroke: #3a3a3a; stroke-width: 2; fill: none; }
+    </style>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#3a3a3a"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1200" height="640" rx="18"/>
+
+  <text class="h1" x="56" y="62">How a transcript is obtained</text>
+  <text class="box-s" x="56" y="90">Each layer falls through to the next one if it fails.</text>
+
+  <!-- left column: default -->
+  <text class="h2" x="56" y="138">DEFAULT</text>
+
+  <rect class="panel" x="56" y="156" width="510" height="82" rx="12"/>
+  <text class="num"   x="80" y="184">01</text>
+  <text class="box-t" x="112" y="187">Subtitles</text>
+  <text class="box-s" x="112" y="212">Instant, exact, costs nothing.</text>
+
+  <path class="arrow" d="M120 238 L120 274" marker-end="url(#head)"/>
+  <text class="fall" x="136" y="264">no subtitles</text>
+
+  <rect class="panel" x="56" y="280" width="510" height="82" rx="12"/>
+  <text class="num"   x="80" y="308">02</text>
+  <text class="box-t" x="112" y="311">The model watches the video</text>
+  <text class="box-s" x="112" y="336">Reads slides and whiteboards too. Needs a Gemini key.</text>
+
+  <path class="arrow" d="M120 362 L120 398" marker-end="url(#head)"/>
+  <text class="fall" x="136" y="388">no key</text>
+
+  <rect class="panel" x="56" y="404" width="510" height="82" rx="12"/>
+  <text class="num"   x="80" y="432">03</text>
+  <text class="box-t" x="112" y="435">Whisper on your CPU</text>
+  <text class="box-s" x="112" y="460">Slow, free, no quota, works offline.</text>
+
+  <!-- right column: read screen -->
+  <text class="h2" x="634" y="138">READ SCREEN</text>
+
+  <rect class="panel-accent" x="634" y="156" width="510" height="82" rx="12"/>
+  <rect class="accent" x="634" y="168" width="3" height="58" rx="1.5"/>
+  <text class="num"   x="658" y="184">01</text>
+  <text class="box-t" x="690" y="187">The model watches the video</text>
+  <text class="box-s" x="690" y="212">Runs first, because you want what was on screen.</text>
+
+  <path class="arrow" d="M698 238 L698 274" marker-end="url(#head)"/>
+  <text class="fall" x="714" y="264">also fetched, see below</text>
+
+  <rect class="panel" x="634" y="280" width="510" height="82" rx="12"/>
+  <text class="num"   x="658" y="308">02</text>
+  <text class="box-t" x="690" y="311">Subtitles</text>
+  <text class="box-s" x="690" y="336">Kept as the timeline reference, not discarded.</text>
+
+  <path class="arrow" d="M698 362 L698 398" marker-end="url(#head)"/>
+  <text class="fall" x="714" y="388">both unavailable</text>
+
+  <rect class="panel" x="634" y="404" width="510" height="82" rx="12"/>
+  <text class="num"   x="658" y="432">03</text>
+  <text class="box-t" x="690" y="435">Whisper on your CPU</text>
+  <text class="box-s" x="690" y="460">Same last resort as the default mode.</text>
+
+  <!-- merge callout -->
+  <rect class="panel-accent" x="56" y="516" width="1088" height="88" rx="12"/>
+  <rect class="accent" x="56" y="534" width="3" height="52" rx="1.5"/>
+  <text class="lead" x="88" y="552">When both are available, each source contributes the half it is good at</text>
+  <text class="body" x="88" y="582">Spoken transcript and its timeline come from the subtitles. On-screen notes come from the model, merged back in by time.</text>
+</svg>
