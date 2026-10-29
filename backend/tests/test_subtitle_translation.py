@@ -37,7 +37,7 @@ def test_translation_validates_exact_ids():
 def test_reuses_translation_cache_without_model_call():
     cues = [{"id": 0, "text": "Hello"}, {"id": 1, "text": "World"}]
     with patch.object(translation_cache, "get", return_value="已快取"), \
-         patch.object(opencode, "generate") as generate:
+         patch.object(opencode, "generate_free") as generate:
         translated, model = subtitle_translation.translate_batch(cues)
     generate.assert_not_called()
     assert translated == [
@@ -52,12 +52,12 @@ def test_calls_only_free_model_and_preserves_ids():
     with patch.object(translation_cache, "get", side_effect=lambda text, model:
                       "建立 API" if text == "Create an API" else None), \
          patch.object(translation_cache, "put") as put, \
-         patch.object(opencode, "generate", return_value=(response, "free")) as generate:
+         patch.object(opencode, "generate_free", return_value=(response, "free")) as generate:
         translated, _ = subtitle_translation.translate_batch(cues)
-    args, kwargs = generate.call_args
-    assert kwargs["model"] == opencode.DEFAULT_FREE_MODEL
-    assert "Press Start" in args[0]
-    assert "Create an API" not in args[0]
+    args, _ = generate.call_args
+    prompt = args[0][0]["content"]
+    assert "Press Start" in prompt
+    assert "Create an API" not in prompt
     assert translated[1]["translation"] == "按下開始"
     put.assert_called_once_with("Press Start", opencode.DEFAULT_FREE_MODEL, "按下開始")
 
@@ -161,7 +161,7 @@ def test_ollama_translation_uses_own_model_and_cache():
     with patch.object(translation_cache, "get", return_value=None) as cached, \
          patch.object(translation_cache, "put") as put, \
          patch.object(ollama, "generate", return_value=(fake, "Ollama/qwen3:4b")) as local, \
-         patch.object(opencode, "generate") as cloud:
+         patch.object(opencode, "generate_free") as cloud:
         result, name = subtitle_translation.translate_batch([{"id":0,"text":"Hello"}], provider=label)
     assert name == label
     assert result == [{"id":0,"translation":"你好"}]

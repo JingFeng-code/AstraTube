@@ -101,12 +101,13 @@ def ask(req: AskRequest) -> dict:
 
     system = ask_system(transcript, False, language)
 
-    # 嚴格模式只試指定的那一個；自動模式先試已設定金鑰的付費供應商，再退回免費接力
-    if not is_auto:
-        chain: list[tuple[str, str]] = [(kind, model)]
-    else:
+    # 嚴格模式只試指定的那一個；自動模式先試已設定金鑰的付費供應商，再退回免費接力；
+    # free（一般模式）只在免費模型之間接力
+    use_free = is_auto or kind == llm_router.FREE
+    if is_auto:
         chain = [(k, m) for k, m in llm_router.configured_paid_chain() if k != llm_router.GEMINI]
-        chain += [(llm_router.OPENCODE, m) for m in opencode.AUTO_CHAIN]
+    else:
+        chain = [] if kind == llm_router.FREE else [(kind, model)]
 
     last: Exception | None = None
     for k, m in chain:
@@ -118,4 +119,10 @@ def ask(req: AskRequest) -> dict:
         except Exception as e:  # noqa: BLE001
             last = e
             print(f"[ask] {k}/{m} 失敗，換下一個…：{e}", flush=True)
+    if use_free:
+        try:
+            text, label = opencode.generate_free(chat, system)
+            return {"answer": to_traditional(text, language), "model_used": label, "searched": False}
+        except Exception as e:  # noqa: BLE001
+            last = e
     raise HTTPException(500, messages.t("ask.failed", error=last))

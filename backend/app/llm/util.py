@@ -20,6 +20,8 @@ def is_transient(e: Exception) -> bool:
     from app.llm.base import EmptyResponseError
     if isinstance(e, EmptyResponseError):
         return True  # 空回應重試通常就好，不該當成永久失敗直接放棄整段
+    if getattr(e, "model_unavailable", False):
+        return False  # 模型下架／暫停：重試同一個模型沒用，直接換下一個
     code = getattr(e, "code", None) or getattr(e, "status_code", None)
     try:
         if int(code) in (429, 500, 502, 503, 504):

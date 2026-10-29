@@ -2,6 +2,7 @@
 
 provider 格式：
   - None / "" / "auto"        自動：先免費模型接力，全滅才落到已設定金鑰的付費供應商
+  - "free"                    只用免費模型：OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）
   - "gemini"                  嚴格：只用 gemini-flash-lite-latest
   - "opencode:<model_id>"     嚴格：只用該 OpenCode 免費模型
   - "deepseek:<model_id>"     嚴格：只用該 DeepSeek 模型
@@ -10,11 +11,11 @@ provider 格式：
 """
 from typing import Any, Callable, Optional, Tuple
 
-from app.core import messages
 from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm.base import NotConfiguredError, RefusalError
 
 AUTO = "auto"
+FREE = "free"
 GEMINI = "gemini"
 OPENCODE = "opencode"
 DEEPSEEK = "deepseek"
@@ -40,6 +41,8 @@ def parse(provider: Optional[str]) -> Tuple[str, str]:
             return kind, (model or _default_model(kind))
     if p == GEMINI:
         return GEMINI, gemini.MODEL
+    if p == FREE:
+        return FREE, DEFAULT_AUTO_MODEL
     # 未知字串一律當自動，避免舊設定（如已下架的模型 id）讓使用者卡住
     print(f"[LLM] 不認得的 provider「{p}」，改用自動模式。", flush=True)
     return AUTO, DEFAULT_AUTO_MODEL
@@ -91,26 +94,23 @@ def generate(provider: Optional[str], prompt: str, system: str = "", seg: int = 
              on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
     """回傳 (文字, 實際產生答案的模型標籤)。seg 是段落索引，用來錯開 Gemini 金鑰。"""
     kind, model = parse(provider)
+    chat = [{"role": "user", "content": prompt}]
 
+    if kind == FREE:
+        return opencode.generate_free(chat, system, on_status=on_status)
     if kind != AUTO:
         return _call(kind, model, prompt, system, seg, on_status)
 
     # 自動模式：先跑 OpenCode 免費模型接力（單模型重試 2 次就換下一個），
     # 整條鏈耗盡才依序備援到有金鑰的付費供應商。
-    last: Exception | None = None
-    for index, m in enumerate(opencode.AUTO_CHAIN):
-        if index and on_status:
-            on_status({"state": "model_switch", "provider": OPENCODE, "model": m})
-        try:
-            return opencode.generate(prompt, system, model=m, seg=seg, tries=2,
-                                     on_status=on_status)
-        except Exception as e:  # noqa: BLE001
-            last = e
-            print(f"[LLM] OpenCode/{m} 失敗，換下一個免費模型…：{e}", flush=True)
+    try:
+        return opencode.generate_free(chat, system, on_status=on_status)
+    except Exception as e:  # noqa: BLE001
+        last: Exception = e
 
     paid = configured_paid_chain()
     if not paid:
-        raise last if last else RuntimeError(messages.t("llm.all_free_failed"))
+        raise last
 
     for kind_p, model_p in paid:
         print(f"[LLM] OpenCode 接力鏈耗盡，自動備援到 {kind_p}/{model_p}…", flush=True)
@@ -141,6 +141,6 @@ def parallel_workers(provider: Optional[str], chunks: int) -> int:
     return max(1, min(4, chunks))
 
 
-__all__ = ["AUTO", "GEMINI", "OPENCODE", "DEEPSEEK", "OPENAI", "ANTHROPIC", "OLLAMA",
+__all__ = ["AUTO", "FREE", "GEMINI", "OPENCODE", "DEEPSEEK", "OPENAI", "ANTHROPIC", "OLLAMA",
            "DEFAULT_AUTO_MODEL", "NotConfiguredError", "RefusalError",
            "generate", "parse", "parallel_workers", "configured_paid_chain"]

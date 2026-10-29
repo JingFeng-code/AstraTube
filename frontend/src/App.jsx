@@ -16,13 +16,12 @@ import useImplement from './hooks/useImplement.js'
 import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
-import { isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
+import { DEFAULT_FREE_PROVIDER, isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
 const SAVED=(()=>{try{return JSON.parse(localStorage.getItem(SKEY))||{}}catch{return {}}})()
-const DEFAULT_PROVIDER='opencode:deepseek-v4-flash-free'
 // 深視覺開關：獨立存一把 key，跨網址/工作階段延續使用者的偏好
 const DVKEY='ycr-deep-visual'
 // 頂欄收合狀態：獨立存一把 key，跨工作階段延續使用者的偏好
@@ -69,7 +68,7 @@ function GenerationProgress({ progress }){
 export default function App() {
   const { t, lang, setLang, langs } = useI18n()
   const [url,setUrl]=useState(SAVED.url||'')
-  const [provider,setProvider]=useState(SAVED.provider||DEFAULT_PROVIDER)
+  const [provider,setProvider]=useState(SAVED.provider||DEFAULT_FREE_PROVIDER)
   const [developerMode,setDeveloperModeRaw]=useState(()=>isDeveloperModeSetting(readPreference(DEVKEY)))
   const setDeveloperMode=enabled=>{setDeveloperModeRaw(enabled);try{localStorage.setItem(DEVKEY,enabled?'1':'0')}catch{}}
   const activeProvider=effectiveProvider(developerMode,provider)
@@ -187,6 +186,7 @@ export default function App() {
             {developerMode&&<label className="model-field">
               <select value={provider} onChange={e=>setProvider(e.target.value)}>
                 <option value="auto">{t('input.auto')}</option>
+                <option value="free">{t('input.freeOnly')}</option>
                 {providerGroups.map(p=>(
                   <optgroup key={p.key} label={`${p.label}${p.free?'':p.configured?'':` — ${t('input.needsKey')}`}`}>
                     {p.models.map(id=><option key={`${p.key}:${id}`} value={providerValue(p.key,id)}>{id}</option>)}
