@@ -38,6 +38,7 @@ jobs:
           python tests/test_messages.py
           python tests/test_bilibili.py
           python tests/test_subtitles.py
+          python tests/test_imported_subtitles.py
           python tests/test_subtitle_translation.py
 
   frontend:
