@@ -1,0 +1,13 @@
+# Smaller desktop-alpha backend profile. The optional heavy Whisper/yt-dlp
+# transcription pipeline is deliberately NOT bundled in this first installer.
+fastapi>=0.115.0
+uvicorn>=0.34.0
+python-dotenv>=1.0.1
+requests>=2.32.0
+beautifulsoup4>=4.12.0
+youtube-transcript-api>=1.2.4
+google-genai>=1.0.0
+anthropic>=0.69.0
+httpx>=0.27.0
+json-repair>=0.30.0
+opencc-python-reimplemented
