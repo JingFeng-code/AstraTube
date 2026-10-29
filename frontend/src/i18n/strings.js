@@ -7,7 +7,7 @@ export const LANGS = [
 
 export const STRINGS = {
   en: {
-    'app.name': 'Youtube Card Reader',
+    'app.name': 'AstraTube',
     'app.tagline': 'Turn any video into knowledge cards',
 
     'topbar.expand': 'Expand',
@@ -167,8 +167,11 @@ export const STRINGS = {
 
     'settings.welcome': 'Welcome to Youtube Card Reader',
     'settings.title': 'Settings',
+    'settings.modeSection': 'Experience',
+    'settings.developerMode': 'Developer mode',
+    'settings.developerModeHint': 'Show model controls, API keys, Obsidian, Codex and other advanced tools. This is not an access restriction.',
     'settings.subWelcome': 'First run. The free OpenCode models work with no key at all. Add a paid key later if you want higher quality. Everything is stored locally on this machine.',
-    'settings.sub': 'Change keys and paths any time. Settings never leave this machine.',
+    'settings.sub': 'Choose your language and switch to Developer mode if you need advanced settings.',
     'settings.close': 'Close',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save',
@@ -214,6 +217,7 @@ export const STRINGS = {
     'error.noCards': 'Extraction failed: no cards were produced. Try again or switch models.',
     'error.pickNote': 'Choose a note to append to first',
 
+    'notes.downloadMarkdown': 'Download Markdown notes',
     'note.summary': 'Youtube Card Reader summary',
     'note.untitled': 'Untitled note',
     'note.highlights': 'Highlights',
@@ -227,7 +231,7 @@ export const STRINGS = {
   },
 
   zh: {
-    'app.name': 'Youtube Card Reader',
+    'app.name': 'AstraTube',
     'app.tagline': '把影片變成一疊知識卡',
 
     'topbar.expand': '展開',
@@ -387,8 +391,11 @@ export const STRINGS = {
 
     'settings.welcome': '歡迎使用 Youtube Card Reader',
     'settings.title': '設定',
+    'settings.modeSection': '使用體驗',
+    'settings.developerMode': '開發者模式',
+    'settings.developerModeHint': '開啟模型選擇、API 金鑰、Obsidian、Codex 等進階工具。此選項不是權限驗證。',
     'settings.subWelcome': '第一次使用，OpenCode 免費模型不需金鑰即可開始；想提升品質再補填付費金鑰。所有設定只會存在你這台電腦本機。',
-    'settings.sub': '可隨時更改金鑰與路徑。設定只存在本機。',
+    'settings.sub': '調整介面及輸出語言；需要模型與其他進階設定時，可以開啟開發者模式。',
     'settings.close': '關閉',
     'settings.cancel': '取消',
     'settings.save': '儲存',
@@ -434,6 +441,7 @@ export const STRINGS = {
     'error.noCards': '整理失敗：沒有產生任何重點，請稍後再試或更換模型。',
     'error.pickNote': '請先選擇要附加的筆記',
 
+    'notes.downloadMarkdown': '下載 Markdown 筆記',
     'note.summary': 'Youtube Card Reader 摘要',
     'note.untitled': '未命名筆記',
     'note.highlights': '重點摘錄',
