@@ -448,3 +448,16 @@ button:disabled{cursor:not-allowed}
 .subtitle-import-bar .import-hint{font-size:12px;color:var(--text-faint);flex-basis:100%;line-height:1.5}
 .subtitle-import-bar .import-error{color:var(--danger,#d55);font-size:12px;flex-basis:100%}
 @media(max-width:600px){.subtitle-import-bar{padding:8px 12px 12px}}
+
+/* 播放器上的雙語字幕：疊在 YouTube 控制列上方，不攔截滑鼠 */
+.subtitle-overlay{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);width:min(92%,880px);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;text-align:center;z-index:2}
+.subtitle-overlay-line{max-width:100%;padding:2px 10px;border-radius:6px;background:rgba(0,0,0,.62);color:#fff;font-size:clamp(14px,2.1vw,22px);line-height:1.45;text-shadow:0 1px 2px rgba(0,0,0,.8);overflow-wrap:anywhere}
+.subtitle-overlay-line.translation{color:#ffe28a;font-weight:650}
+.subtitle-overlay-line.original{font-size:clamp(12px,1.6vw,17px);color:#e9e9e9}
+.subtitle-overlay-line.pending{color:#e9e9e9;opacity:.85}
+.subtitle-mode{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden}
+.subtitle-mode button{min-height:32px;padding:4px 11px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--text-soft);font-size:12px;cursor:pointer}
+.subtitle-mode button:last-child{border-right:0}
+.subtitle-mode button.active{background:var(--accent-soft);color:var(--text);font-weight:650}
+.subtitle-mode button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(max-width:600px){.subtitle-overlay{bottom:46px}}
