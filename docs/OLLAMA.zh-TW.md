@@ -24,3 +24,14 @@
 - 此切片只有 mock / CI 驗證；仍須在 Windows / WSL 做 Ollama 真實 API 與影片的端到端驗收，才適合發佈桌面安裝程式。
 
 參考： [Ollama Chat API](https://docs.ollama.com/api/chat) · [列出模型 API](https://docs.ollama.com/api/tags)
+
+
+## 字幕逐句翻譯（開發者模式）
+
+1. 在本機啟動 Ollama 並下載文字對話模型（例如在 PowerShell 執行 `ollama list`，確認已安裝）。
+2. 在 AstraTube 設定啟用「開發者模式」，測試 Ollama 連線後儲存設定。
+3. 開啟公開字幕的 YouTube 或 Bilibili 影片並產生字幕，字幕下方選擇「字幕翻譯引擎 → Ollama · <已安裝模型>」。
+4. 按「翻譯接下來 16 句」，成功後會在原文下方顯示台灣繁體中文；再次開啟將讀取本地快取。
+5. 如需返回一般模式，關閉開發者模式後自動使用預設免費線上翻譯，不會把 Ollama 翻譯混用進來。
+
+這是**明確選擇的本地翻譯**，不是自動改用 Ollama。未執行 Ollama 的 Windows/WSL 或遠端 Codespaces 無法使用此功能；如果 Ollama 本地服務未啟動、模型輸出格式不完整，會顯示錯誤，原文不受影響。**不會因本地失敗而自動改用雲端模型。**
