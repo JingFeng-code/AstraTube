@@ -74,11 +74,14 @@ def get_subtitles(
             raise HTTPException(400, "YouTube 影片 ID 格式不正確。")
         try:
             text, is_chinese = captions.fetch_transcript(video_id)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
             # 字幕不可用時，若本機已有經授權的 Whisper 轉錄快取，仍可顯示。
             local = cache.get(video_id)
             if not local:
-                raise HTTPException(404, "這支影片目前沒有可讀取的字幕。")
+                error = captions.classify_error(exc)
+                # 只有「確實沒有字幕／影片受限」回 404；被擋或斷線是暫時性的服務問題
+                status = 404 if error.kind in ("missing", "unavailable") else 503
+                raise HTTPException(status, str(error)) from exc
             text, is_chinese = local
     elif not imported:
         if not _BILIBILI_ID.fullmatch(video_id):

@@ -12,7 +12,7 @@ import httpx
 from app.core import config, messages
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           ProviderError)
-from app.llm.util import with_retry
+from app.llm.util import connect_error_message, http_error_message, with_retry
 
 # 推理型模型（deepseek-reasoner、gpt-5 thinking 等）單次摘要可能跑數分鐘，讀取逾時要給足
 _CHAT_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=60.0, pool=15.0)
@@ -102,21 +102,20 @@ def list_models(vendor: Vendor) -> Tuple[list[str], str]:
     return list(models), source
 
 
-def _post_chat(vendor: Vendor, model: str, messages: list[dict]) -> str:
+def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict]) -> str:
     """打一次 /chat/completions，回傳助手訊息內容。"""
     try:
         resp = httpx.post(
             f"{vendor.base_url}/chat/completions",
             headers=_headers(vendor),
-            json={"model": model, "messages": messages},
+            json={"model": model, "messages": chat_messages},
             timeout=_CHAT_TIMEOUT,
         )
     except httpx.HTTPError as e:
-        raise ProviderError(messages.t("provider.connect_failed", vendor=vendor.label, error=e))
+        raise ProviderError(connect_error_message(vendor.label, e))
 
     if resp.status_code >= 400:
-        raise ProviderError(messages.t("provider.http_error", vendor=vendor.label,
-                                       status=resp.status_code, detail=resp.text[:200]))
+        raise ProviderError(http_error_message(vendor.label, resp.status_code, resp.text))
     try:
         data = resp.json()
     except Exception:

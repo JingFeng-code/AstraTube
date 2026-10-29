@@ -75,8 +75,19 @@ def _parse_cards(raw: str, language: str) -> dict:
     其他語言不套這層轉換。content_type／actionable 是後加的欄位，模型漏填是常態，
     一律走正規化補預設值，絕不因為缺欄位就讓整份摘要失敗。
     """
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    data = json.loads(repair_json(raw))
+    raw = (raw or "").strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    try:
+        data = json.loads(repair_json(raw)) if raw else None
+    except (TypeError, ValueError):
+        data = None
+    if isinstance(data, list):
+        # 有些模型直接回傳卡片陣列，少了外層物件；內容仍可用
+        data = {"cards": data}
+    # 只輸出思考過程、被截斷到無法修復、或回成其他結構時，要明確告訴使用者，
+    # 不能讓後續程式丟出「'list' object has no attribute 'get'」這種看不懂的錯誤。
+    if not isinstance(data, dict) or not isinstance(data.get("cards"), list):
+        raise ValueError(messages.t("summarize.model_output_invalid"))
+    data["cards"] = [card for card in data["cards"] if isinstance(card, dict)]
     if isinstance(data, dict):
         data["title"] = to_traditional(data.get("title"), language)
         data["content_type"] = _norm_content_type(data.get("content_type"))

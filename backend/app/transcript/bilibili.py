@@ -44,18 +44,38 @@ def transcript_cache_key(bvid: str, page: int) -> str:
     return f"{_CACHE_PREFIX}{bvid}:p{page}"
 
 
+# Bilibili API 的錯誤碼（公開文件與實際回應整理）；未列出的碼仍會附在訊息中方便回報
+_API_CODES = {
+    -404: "Bilibili 找不到這支影片，可能已刪除或網址有誤。",
+    62002: "這支 Bilibili 影片目前不可見（已下架或僅限特定使用者）。",
+    62004: "這支 Bilibili 影片仍在審核中，暫時無法讀取。",
+    -403: "Bilibili 拒絕存取這支影片（權限不足或需要登入）。",
+    -412: "Bilibili 暫時攔截了這個請求（短時間請求過多或被風控），請稍後再試。",
+    -352: "Bilibili 要求額外的安全驗證，目前無法以匿名方式讀取。",
+}
+
+
 def _api_json(path: str, params: dict, referer: str) -> dict:
     try:
         response = requests.get(
             f"https://api.bilibili.com{path}", params=params,
             headers={**_HEADERS, "Referer": referer}, timeout=15,
         )
-        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise ValueError("無法連線到 Bilibili（網路、Proxy 或防火牆問題），請確認網路後重試。") from exc
+    if response.status_code == 412:
+        raise ValueError(_API_CODES[-412])
+    if response.status_code >= 400:
+        raise ValueError(f"Bilibili 服務回應 HTTP {response.status_code}，請稍後重試。")
+    try:
         result = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        raise ValueError("Bilibili 服務暫時無法取得影片資訊或字幕，請稍後重試。") from exc
-    if not isinstance(result, dict) or result.get("code") != 0:
-        raise ValueError("Bilibili 回應失敗，影片可能受地區、權限或流量限制。")
+    except ValueError as exc:
+        raise ValueError("Bilibili 回應格式無法解析，請稍後重試。") from exc
+    if not isinstance(result, dict):
+        raise ValueError("Bilibili 回應格式無法解析，請稍後重試。")
+    code = result.get("code")
+    if code != 0:
+        raise ValueError(_API_CODES.get(code, f"Bilibili 回應失敗（錯誤碼 {code}），影片可能受地區、權限或流量限制。"))
     return result.get("data") or {}
 
 
@@ -116,8 +136,10 @@ def fetch_transcript(bvid: str, page: int = 1) -> tuple[str, bool]:
     subtitles = (player.get("subtitle") or {}).get("subtitles") or []
     if not subtitles:
         if player.get("need_login_subtitle"):
-            raise ValueError("這支 Bilibili 影片的字幕需要登入才能讀取；目前 AstraTube 不存取帳號 Cookie。")
-        raise ValueError("這支 Bilibili 影片沒有可公開取得的字幕；目前不會自動下載影音轉錄。")
+            raise ValueError("這支 Bilibili 影片的字幕需要登入才能讀取；AstraTube 不讀取帳號 Cookie。"
+                             "如果你有權使用這支影片的字幕，可以匯入 SRT／VTT 字幕檔後再按「開始」。")
+        raise ValueError("這支 Bilibili 影片沒有可公開取得的字幕；目前不會自動下載影音轉錄。"
+                         "如果你有權使用字幕，可以匯入 SRT／VTT 字幕檔後再按「開始」。")
 
     def rank(item: dict) -> tuple:
         lang = str(item.get("lan") or "").lower()

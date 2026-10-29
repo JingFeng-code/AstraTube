@@ -86,7 +86,7 @@ def _text_of(resp) -> str:
     return "".join(parts)
 
 
-def _once(model: str, messages: list[dict], system: str) -> str:
+def _once(model: str, chat_messages: list[dict], system: str) -> str:
     """打一次 Messages API，回傳純文字。"""
     import anthropic
     try:
@@ -94,7 +94,7 @@ def _once(model: str, messages: list[dict], system: str) -> str:
             model=model,
             max_tokens=MAX_TOKENS,
             **({"system": system} if system else {}),
-            messages=messages,
+            messages=chat_messages,
         )
     except anthropic.APIStatusError as e:
         # 429／5xx 交給 with_retry 判定為暫時性錯誤；其餘（400/401/404）立即失敗

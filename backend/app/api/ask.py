@@ -51,16 +51,16 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
         return None
 
 
-def _answer_with(kind: str, model: str, messages: list[dict], system: str) -> tuple[str, str]:
+def _answer_with(kind: str, model: str, chat: list[dict], system: str) -> tuple[str, str]:
     """對單一供應商發問，回傳 (答案, 模型標籤)。"""
     if kind == llm_router.OLLAMA:
-        return ollama.generate_messages(messages, system, model=model)
+        return ollama.generate_messages(chat, system, model=model)
     if kind == llm_router.ANTHROPIC:
-        return anthropic_api.generate_messages(messages, system, model=model, tries=2)
+        return anthropic_api.generate_messages(chat, system, model=model, tries=2)
     if kind in openai_compat.VENDORS:
-        return openai_compat.generate_messages(openai_compat.VENDORS[kind], messages,
+        return openai_compat.generate_messages(openai_compat.VENDORS[kind], chat,
                                                system, model=model, tries=2)
-    return opencode.generate_messages(messages, system, model=model, tries=2)
+    return opencode.generate_messages(chat, system, model=model, tries=2)
 
 
 @router.post("/ask")
@@ -77,8 +77,9 @@ def ask(req: AskRequest) -> dict:
         transcript = transcript[:_MAX_TRANSCRIPT_CHARS] + "\n（逐字稿過長，以上為截斷後的前段）"
 
     language = config.get("OUTPUT_LANGUAGE")
-    messages = [{"role": m.role, "content": m.content} for m in req.history]
-    messages.append({"role": "user", "content": req.question})
+    # 不可命名為 messages：會遮蔽上方匯入的 app.core.messages，讓錯誤處理本身再出錯
+    chat = [{"role": m.role, "content": m.content} for m in req.history]
+    chat.append({"role": "user", "content": req.question})
 
     kind, model = llm_router.parse(req.provider)
     is_auto = kind == llm_router.AUTO
@@ -86,7 +87,7 @@ def ask(req: AskRequest) -> dict:
 
     if use_gemini:
         try:
-            text, label = gemini.generate_chat(messages, ask_system(transcript, True, language))
+            text, label = gemini.generate_chat(chat, ask_system(transcript, True, language))
             # 有掛搜尋工具時 generate_chat 會在標籤後加後綴；後綴文字隨介面語言變，
             # 所以比對「標籤有沒有被加料」而不是比對某個語言的字面值
             return {"answer": to_traditional(text, language), "model_used": label,
@@ -110,7 +111,7 @@ def ask(req: AskRequest) -> dict:
     last: Exception | None = None
     for k, m in chain:
         try:
-            text, label = _answer_with(k, m, messages, system)
+            text, label = _answer_with(k, m, chat, system)
             return {"answer": to_traditional(text, language), "model_used": label, "searched": False}
         except RefusalError as e:
             raise HTTPException(400, str(e))

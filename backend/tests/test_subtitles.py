@@ -42,13 +42,25 @@ def test_invalid_id_and_missing_subtitles():
             assert False, "bad IDs should be rejected"
         except HTTPException as exc:
             assert exc.status_code == 400
-    with patch.object(subtitles.captions, "fetch_transcript", side_effect=ValueError("no transcript")), \
+    missing = subtitles.captions.CaptionError("missing", "no transcript")
+    with patch.object(subtitles.captions, "fetch_transcript", side_effect=missing), \
          patch.object(subtitles.cache, "get", return_value=None):
         try:
             subtitles.get_subtitles("youtube", "M7lc1UVf-VE", 1)
             assert False, "no source should not be reported as successful"
         except HTTPException as exc:
             assert exc.status_code == 404
+            assert "沒有提供公開字幕" in exc.detail
+    # 斷線不是「沒有字幕」：回 503 並說明影片可能仍有字幕
+    network = subtitles.captions.CaptionError("network", "ProxyError")
+    with patch.object(subtitles.captions, "fetch_transcript", side_effect=network), \
+         patch.object(subtitles.cache, "get", return_value=None):
+        try:
+            subtitles.get_subtitles("youtube", "M7lc1UVf-VE", 1)
+            assert False
+        except HTTPException as exc:
+            assert exc.status_code == 503
+            assert "可能有字幕" in exc.detail
 
 
 if __name__ == "__main__":

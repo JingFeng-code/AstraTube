@@ -28,12 +28,19 @@ class Content(TypedDict):
     transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper；文章為 None
 
 
-def _fetch_captions(video_id: str) -> Optional[tuple[str, bool]]:
-    """抓字幕，抓不到回 None。結果有跨重啟快取，重複呼叫不會重打網路。"""
+def _fetch_captions(video_id: str,
+                    errors: Optional[list[captions.CaptionError]] = None) -> Optional[tuple[str, bool]]:
+    """抓字幕，抓不到回 None。結果有跨重啟快取，重複呼叫不會重打網路。
+
+    失敗原因放進 errors，讓最後的錯誤訊息能分辨「真的沒字幕」與「被擋／斷線」。
+    """
     try:
         return captions.fetch_transcript(video_id)
     except Exception as e:  # noqa: BLE001
-        print(f"[transcript] 字幕取得失敗：{e}", flush=True)
+        error = captions.classify_error(e)
+        print(f"[transcript] 字幕取得失敗（{error.kind}）：{error.detail}", flush=True)
+        if errors is not None:
+            errors.append(error)
         return None
 
 
@@ -55,9 +62,10 @@ def _try_deepsrt(url: str, video_id: str) -> Optional[Content]:
         return None
 
 
-def _try_captions(video_id: str) -> Optional[Content]:
+def _try_captions(video_id: str,
+                  errors: Optional[list[captions.CaptionError]] = None) -> Optional[Content]:
     """字幕層：抓不到回 None，由呼叫端落到下一層。"""
-    hit = _fetch_captions(video_id)
+    hit = _fetch_captions(video_id, errors)
     return _pack("youtube", video_id, hit[0], hit[1], "captions") if hit else None
 
 
@@ -67,18 +75,25 @@ def _youtube(url: str, video_id: str, deep_visual: bool, allow_cloud_fallback: b
     allow_cloud_fallback=False 時（使用者明確選了 Ollama／OpenCode 等非 Gemini 模型），
     字幕失敗不得改把影片交給 Gemini 雲端轉錄，直接落到本機 Whisper。
     """
+    caption_errors: list[captions.CaptionError] = []
     if deep_visual:
-        order = (lambda: _try_deepsrt(url, video_id), lambda: _try_captions(video_id))
+        order = (lambda: _try_deepsrt(url, video_id), lambda: _try_captions(video_id, caption_errors))
     elif allow_cloud_fallback:
-        order = (lambda: _try_captions(video_id), lambda: _try_deepsrt(url, video_id))
+        order = (lambda: _try_captions(video_id, caption_errors), lambda: _try_deepsrt(url, video_id))
     else:
-        order = (lambda: _try_captions(video_id),)
+        order = (lambda: _try_captions(video_id, caption_errors),)
     for layer in order:
         result = layer()
         if result is not None:
             return result
 
-    text, is_chinese = whisper_local.transcribe_url(url, cache_key=video_id)
+    try:
+        text, is_chinese = whisper_local.transcribe_url(url, cache_key=video_id)
+    except ValueError as exc:
+        # 先說明字幕為什麼拿不到（沒字幕／被擋／斷線），再說明為什麼無法改用語音轉錄
+        if caption_errors:
+            raise ValueError(f"{caption_errors[-1]} {exc}") from exc
+        raise
     return _pack("youtube", video_id, text, is_chinese, "whisper")
 
 

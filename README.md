@@ -71,7 +71,7 @@ AstraTube 已新增 Tauri v2 + FastAPI Sidecar 的 Windows 桌面架構與自動
 
 - [Codespaces / Windows / WSL 開發指南](docs/DEVELOPMENT.zh-TW.md)
 - [分階段開發路線](docs/ROADMAP.md)
-- [技術稽核報告](docs/ASTRATUBE_AUDIT.zh-TW.md)・[Beta 發布門檻](docs/BETA_READINESS.zh-TW.md)・[Windows 實機驗收腳本](docs/MANUAL_SMOKE_TEST.zh-TW.md)
+- [技術稽核報告](docs/ASTRATUBE_AUDIT.zh-TW.md)・[Beta 發布門檻](docs/BETA_READINESS.zh-TW.md)・[Windows 實機驗收腳本](docs/MANUAL_SMOKE_TEST.zh-TW.md)・[常見錯誤訊息與處理](docs/TROUBLESHOOTING.zh-TW.md)
 - [上游原始 README](docs/UPSTREAM_README.md)
 - [第三方授權與來源](THIRD_PARTY_NOTICES.md)
 
