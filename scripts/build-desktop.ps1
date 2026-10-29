@@ -1,4 +1,4 @@
-# Windows x64 desktop ALPHA (unsigned). Run from repository root.
+﻿# Windows x64 portable ALPHA (unsigned, no installer). Run from repository root.
 param([switch]$SkipInstall)
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -36,8 +36,23 @@ try {
 
 Push-Location desktop
 try {
-  npx --yes "@tauri-apps/cli@2" build --bundles nsis
-  if ($LASTEXITCODE -ne 0) { throw "Tauri desktop installer build failed" }
+  # 只編譯執行檔，不產生安裝程式；tauri-build 會把 sidecar 複製到 target/release
+  npx --yes "@tauri-apps/cli@2" build --no-bundle
+  if ($LASTEXITCODE -ne 0) { throw "Tauri desktop build failed" }
 } finally { Pop-Location }
 
-Write-Host "Unsigned alpha installers: desktop/src-tauri/target/release/bundle/nsis/"
+# 組出免安裝版資料夾：主程式與背景服務必須在同一層（sidecar 從主程式所在資料夾尋找）
+$release = Join-Path $root "desktop/src-tauri/target/release"
+$outDir = Join-Path $root "desktop/portable"
+$portable = Join-Path $outDir "AstraTube-Portable"
+if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
+New-Item -ItemType Directory -Force $portable | Out-Null
+Copy-Item (Join-Path $release "astratube-desktop.exe") (Join-Path $portable "AstraTube.exe")
+Copy-Item (Join-Path $release "astratube-backend.exe") (Join-Path $portable "astratube-backend.exe")
+# 使用說明等文件（腳本內不寫中文檔名，避免 Windows PowerShell 5.1 以 ANSI 讀取時亂碼）
+Copy-Item (Join-Path $root "desktop/portable-template/*") $portable
+Copy-Item (Join-Path $root "LICENSE") (Join-Path $portable "LICENSE.txt")
+Copy-Item (Join-Path $root "THIRD_PARTY_NOTICES.md") $portable
+Compress-Archive -Path $portable -DestinationPath (Join-Path $outDir "AstraTube-Portable-x64.zip") -Force
+
+Write-Host "Unsigned portable alpha: desktop/portable/AstraTube-Portable/ (zip: desktop/portable/AstraTube-Portable-x64.zip)"

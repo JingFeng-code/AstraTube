@@ -29,5 +29,6 @@ Thumbs.db
 /backend/build/
 /backend/dist/
 /desktop/src-tauri/target/
+/desktop/portable/
 /desktop/src-tauri/binaries/*.exe
 /desktop/src-tauri/binaries/*-pc-windows-msvc
