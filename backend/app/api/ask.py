@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core import config, messages
 from app.core.zh import to_traditional
-from app.llm import anthropic_api, gemini, opencode, openai_compat
+from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm import router as llm_router
 from app.llm.base import NotConfiguredError, RefusalError
 from app.models.schemas import AskRequest
@@ -46,6 +46,8 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
 
 def _answer_with(kind: str, model: str, messages: list[dict], system: str) -> tuple[str, str]:
     """對單一供應商發問，回傳 (答案, 模型標籤)。"""
+    if kind == llm_router.OLLAMA:
+        return ollama.generate_messages(messages, system, model=model)
     if kind == llm_router.ANTHROPIC:
         return anthropic_api.generate_messages(messages, system, model=model, tries=2)
     if kind in openai_compat.VENDORS:

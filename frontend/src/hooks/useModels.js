@@ -4,6 +4,8 @@ import * as api from '../api.js'
 // 後端 /models 尚未就緒或抓取失敗時的退回清單。
 // free: 不需金鑰就能用；configured: 是否已填金鑰（離線時無從得知，一律當 false）。
 export const STATIC_PROVIDERS = {
+  // 只有後端實際連到本機 Ollama 後才會列出已下載模型；沒有假預設。
+  ollama: { label:'Ollama（本機）', free:true, configured:false, source:'local', models:[] },
   opencode: {
     label: 'OpenCode', free: true, configured: true, source: 'static',
     models: ['deepseek-v4-flash-free','big-pickle','mimo-v2.5-free','laguna-s-2.1-free','ling-3.0-flash-free','ling-3.0-tiny-free','nemotron-3-ultra-free','north-mini-code-free','longcat-2.0-free'],
@@ -15,7 +17,7 @@ export const STATIC_PROVIDERS = {
 }
 
 // 下拉選單的供應商顯示順序：免費的排最前，其餘依常用度
-export const PROVIDER_ORDER = ['opencode', 'gemini', 'deepseek', 'openai', 'anthropic']
+export const PROVIDER_ORDER = ['opencode', 'ollama', 'gemini', 'deepseek', 'openai', 'anthropic']
 
 // Gemini 在後端是「整個供應商只有一個模型」，provider 字串就是 "gemini"（不帶 :model）
 export const providerValue = (kind, model) => (kind === 'gemini' ? 'gemini' : `${kind}:${model}`)

@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.core import config, languages, messages
+from app.llm import ollama
 from app.models.schemas import SettingsUpdate
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -48,6 +49,8 @@ def _public_state() -> dict:
         "obsidian_exists": bool(vault) and Path(vault).expanduser().exists(),
         "output_language": config.get("OUTPUT_LANGUAGE") or languages.DEFAULT,
         "ui_language": config.get("UI_LANGUAGE") or "zh-Hant",
+        "ollama_base_url": config.get("OLLAMA_BASE_URL") or ollama.DEFAULT_BASE_URL,
+        "ollama_model": config.get("OLLAMA_MODEL") or "",
         "languages": languages.codes(),
     }
     for api_field, cfg_field in _KEY_FIELDS:
@@ -74,6 +77,17 @@ def update_settings(req: SettingsUpdate) -> dict:
         value = getattr(req, api_field, None)
         if value is not None:
             updates[cfg_field] = value.strip()
+    if req.ollama_base_url is not None:
+        try:
+            updates["OLLAMA_BASE_URL"] = ollama.validate_base_url(req.ollama_base_url)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    if req.ollama_model is not None:
+        try:
+            updates["OLLAMA_MODEL"] = (ollama.validate_model(req.ollama_model)
+                                       if req.ollama_model.strip() else "")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     if req.obsidian_vault_path is not None:
         updates["OBSIDIAN_VAULT_PATH"] = req.obsidian_vault_path.strip()
     if req.obsidian_notes_folder is not None:

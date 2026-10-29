@@ -11,7 +11,7 @@
 
 ## Phase 1：本地模型與繁體品質
 
-- [ ] FastAPI 新增可設定 Ollama Provider（模型與本機位址）
+- [x] FastAPI 新增可設定 Ollama Provider（摘要、問答、模型清單與連線檢查；本地環境待驗收）
 - [ ] 保留原始逐字稿，不直接對英文原文強制繁化
 - [ ] 技術專有名詞表、翻譯快取與品質測試
 
@@ -55,3 +55,13 @@
 - [x] Python / Node 對齊與快取測試
 - [ ] 真人驗收：實際 YouTube / Bilibili 字幕 API、翻譯效果及播放器同步
 - [ ] 未來：SRT/VTT 上傳、字幕更準確的起訖區間、本地 Ollama
+
+
+## Phase 1b：本地 Ollama Provider（Issue #3 第一切片）
+- [x] 以 `/api/chat` 接入本機摘要、問答與深入解析
+- [x] 開發者模式設定網址／模型，透過 `/api/tags` 讀取已安裝模型
+- [x] 嚴格指定 Ollama 時不 fallback 到雲端付費供應商
+- [x] 本地併發限制 1、連線錯誤提示、回環網域與埠檢查
+- [x] Mock Ollama API 回歸測試
+- [ ] Windows / WSL 真實本地 Ollama 端到端驗收
+- [ ] 後續支援雙語字幕使用本地模型翻譯（目前仍使用第三方免費模型）

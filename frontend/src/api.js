@@ -80,6 +80,7 @@ export async function getSettings() {
   catch { return {configured:false,offline:true} }
 }
 export const saveSettings = (payload) => post('/settings', payload)
+export const getOllamaStatus = () => get('/ollama/status')
 // 模型下拉選單清單；後端未就緒時回 null，由呼叫端退回靜態清單
 export async function getModels() {
   try { return await get('/models') } catch { return null }

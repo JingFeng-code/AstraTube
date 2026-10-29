@@ -11,7 +11,7 @@ provider 格式：
 from typing import Any, Callable, Optional, Tuple
 
 from app.core import messages
-from app.llm import anthropic_api, gemini, opencode, openai_compat
+from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm.base import NotConfiguredError, RefusalError
 
 AUTO = "auto"
@@ -20,9 +20,10 @@ OPENCODE = "opencode"
 DEEPSEEK = "deepseek"
 OPENAI = "openai"
 ANTHROPIC = "anthropic"
+OLLAMA = "ollama"
 
 # 帶 "<kind>:<model>" 前綴的供應商
-_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC)
+_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA)
 
 # 自動模式的首選（免費、不需金鑰）
 DEFAULT_AUTO_MODEL = opencode.DEFAULT_FREE_MODEL
@@ -45,6 +46,8 @@ def parse(provider: Optional[str]) -> Tuple[str, str]:
 
 
 def _default_model(kind: str) -> str:
+    if kind == OLLAMA:
+        return ollama.default_model()
     if kind == ANTHROPIC:
         return anthropic_api.DEFAULT_MODEL
     if kind in openai_compat.VENDORS:
@@ -57,6 +60,8 @@ def _call(kind: str, model: str, prompt: str, system: str, seg: int,
     """對單一供應商發一次生成請求。"""
     if kind == GEMINI:
         return gemini.generate(prompt, system, seg=seg, on_status=on_status)
+    if kind == OLLAMA:
+        return ollama.generate(prompt, system, model=model, seg=seg, on_status=on_status)
     if kind == ANTHROPIC:
         return anthropic_api.generate(prompt, system, model=model, on_status=on_status)
     if kind in openai_compat.VENDORS:
@@ -129,11 +134,13 @@ def parallel_workers(provider: Optional[str], chunks: int) -> int:
     但再往上拉容易撞到未公開的免費層／低方案併發限制。
     """
     kind, _ = parse(provider)
+    if kind == OLLAMA:
+        return 1  # 本機 GPU 通常只有一張，避免長影片多併發導致 OOM。
     if kind == GEMINI:
         return max(1, min(gemini.key_count() or 1, chunks, 6))
     return max(1, min(4, chunks))
 
 
-__all__ = ["AUTO", "GEMINI", "OPENCODE", "DEEPSEEK", "OPENAI", "ANTHROPIC",
+__all__ = ["AUTO", "GEMINI", "OPENCODE", "DEEPSEEK", "OPENAI", "ANTHROPIC", "OLLAMA",
            "DEFAULT_AUTO_MODEL", "NotConfiguredError", "RefusalError",
            "generate", "parse", "parallel_workers", "configured_paid_chain"]
