@@ -15,3 +15,13 @@ export function visibleCues(cues, filter) {
   const q = (filter || '').trim().toLocaleLowerCase()
   return q ? cues.filter(c => [c.text, c.translation].some(s => (s || '').toLocaleLowerCase().includes(q))) : cues
 }
+
+
+// 後端回傳的翻譯以字幕原始陣列 index 對應；其他時間戳欄位絕不改動。
+export function applyTranslations(cues, translations) {
+  const byId = new Map((translations || []).filter(row =>
+    Number.isInteger(row?.id) && typeof row?.translation === 'string'
+  ).map(row => [row.id, row.translation]))
+  return cues.map((cue, idx) =>
+    byId.has(idx) ? {...cue, translation:byId.get(idx)} : cue)
+}
