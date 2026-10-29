@@ -120,6 +120,30 @@ def test_failure_status_graceful():
     assert status["connected"] is False and status["models"] == []
 
 
+def test_status_for_unsaved_url_keeps_loopback_rule():
+    """設定畫面可測試尚未儲存的網址，但仍不得連到回環 11434 以外的位置（防 SSRF）。"""
+    fake=FakeClient({"models":[{"name":"llama3.2:3b"},{"name":"remote:cloud"}]})
+    with patch.object(ollama.httpx,"Client",return_value=fake):
+        status=ollama.connection_status("http://localhost:11434")
+    assert status["connected"] is True and status["models"]==["llama3.2:3b"]
+    assert fake.calls[0][1]=="http://localhost:11434/api/tags"
+    for bad in ("http://192.168.1.5:11434","http://127.0.0.1:8420","https://evil.example"):
+        with patch.object(ollama.httpx,"Client") as client:
+            status=ollama.connection_status(bad)
+        client.assert_not_called()
+        assert status["connected"] is False and "11434" in status["message"]
+
+
+def test_status_endpoint_accepts_base_url():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    fake=FakeClient({"models":[{"name":"qwen3:4b"}]})
+    with patch.object(ollama.httpx,"Client",return_value=fake), patch.dict("os.environ",{"ASTRA_DESKTOP_TOKEN":""}):
+        response=TestClient(app, base_url="http://127.0.0.1:8420").get(
+            "/ollama/status", params={"base_url":"http://127.0.0.1:11434"})
+    assert response.status_code==200 and response.json()["models"]==["qwen3:4b"]
+
+
 if __name__=="__main__":
     test_only_loopback_hosts()
     test_models_only_reflect_installed()
@@ -127,4 +151,6 @@ if __name__=="__main__":
     test_configured_model_and_missing_model_error()
     test_ask_uses_ollama_not_opencode()
     test_failure_status_graceful()
+    test_status_for_unsaved_url_keeps_loopback_rule()
+    test_status_endpoint_accepts_base_url()
     print("Ollama provider tests passed")

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as api from '../api.js'
 import { useI18n } from '../i18n/index.jsx'
+import { ollamaModelOptions } from '../utils/ollama-settings.js'
 
 // 每個引擎一列：欄位名 → 標籤／說明／輸入型別
 const ENGINES = [
@@ -59,13 +60,18 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
     setCheckingOllama(true)
     setOllamaStatus(null)
     try {
-      setOllamaStatus(await api.getOllamaStatus())
+      setOllamaStatus(await api.getOllamaStatus(ollamaUrl.trim() || 'http://127.0.0.1:11434'))
     } catch {
       setOllamaStatus({connected:false,models:[],message:t('settings.ollamaUnavailable')})
     } finally {
       setCheckingOllama(false)
     }
   }
+
+  // 開發者模式打開設定時自動讀取已安裝模型，不必先按測試
+  useEffect(() => { if (developerMode) checkOllama() }, [developerMode])
+
+  const modelOptions = ollamaModelOptions(ollamaStatus?.models, ollamaModel)
 
   return (
     <div className="settings-overlay" onMouseDown={e => { if (!mandatory && e.target === e.currentTarget) onClose?.() }}>
@@ -118,16 +124,19 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
           </label>
           <label className="settings-field">
             <span className="settings-label">{t('settings.ollamaModel')}</span>
-            <input type="text" value={ollamaModel} onChange={e=>setOllamaModel(e.target.value)}
-                   autoComplete="off" spellCheck={false} placeholder={t('settings.ollamaModelPlaceholder')}/>
-            <span className="settings-hint">{t('settings.ollamaModelHint')}</span>
+            <select value={ollamaModel} onChange={e=>setOllamaModel(e.target.value)} disabled={checkingOllama && !ollamaStatus}>
+              {modelOptions.map(option => <option key={option.kind + option.value} value={option.value}>
+                {option.kind === 'auto' ? t('settings.ollamaAuto') : option.kind === 'missing' ? t('settings.ollamaMissing', option.value) : option.value}
+              </option>)}
+            </select>
+            <span className="settings-hint">{ollamaStatus?.connected && !ollamaStatus.models?.length ? t('settings.ollamaNoModels') : t('settings.ollamaModelHint')}</span>
           </label>
           <div className="settings-ollama-check">
             <button type="button" className="settings-cancel" onClick={checkOllama} disabled={checkingOllama}>
-              {checkingOllama?t('settings.ollamaChecking'):t('settings.ollamaCheck')}
+              {checkingOllama?t('settings.ollamaChecking'):t('settings.ollamaRefresh')}
             </button>
             {ollamaStatus && <p className={ollamaStatus.connected?'settings-hint':'settings-err'} role="status">
-              {ollamaStatus.message}{ollamaStatus.models?.length?' ('+ollamaStatus.models.join(', ')+')':''}
+              {ollamaStatus.message}
             </p>}
           </div>
           <p className="settings-hint">{t('settings.ollamaCheckHint')}</p>
