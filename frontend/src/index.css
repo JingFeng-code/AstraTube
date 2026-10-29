@@ -401,3 +401,13 @@ button:disabled{cursor:not-allowed}
 .impl-pulse{flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);
   animation:impl-pulse 1.6s ease-in-out infinite}
 @keyframes impl-pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+
+/* 一般使用者模式：以影片網址與開始按鈕為主，不顯示未啟用的進階欄位。 */
+.input-row.input-row-simple{grid-template-columns:minmax(0,1fr) auto}
+.input-row.input-row-simple .btn-go{grid-column:2;grid-row:1;align-self:auto}
+.settings-mode-toggle{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface-2);cursor:pointer}
+.settings-mode-copy{display:flex;flex-direction:column;gap:4px}
+.settings-mode-copy strong{font-size:14px;color:var(--text)}
+.settings-mode-copy small{color:var(--text-soft);font-size:12px;line-height:1.5}
+.settings-mode-toggle input{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0}
+@media(max-width:600px){.input-row.input-row-simple{grid-template-columns:1fr}.input-row.input-row-simple .btn-go{grid-column:1;grid-row:2;width:100%}}

@@ -6,7 +6,7 @@ import { useI18n } from '../i18n/index.jsx'
 // 重點數量多時把導覽縮小排密，避免撐破標題列
 const COMPACT_FROM = 24
 
-export default function CardDeck({ result, index, setIndex, clippedIds, onClip, onJumpVideo, deepdives, onDeepDive, deepdiveLoading, onImplement, fullWidth }) {
+export default function CardDeck({ result, index, setIndex, clippedIds, onClip, onJumpVideo, deepdives, onDeepDive, deepdiveLoading, onImplement, fullWidth, developerMode=false }) {
   const { t } = useI18n()
   const cards=result.cards||[], card=cards[index]
   const dotsRef=useRef(null)
@@ -18,7 +18,7 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
   if (!card) return null
   const transcript=pickField(card,TRANSCRIPT_KEYS), translation=pickField(card,TRANSLATION_KEYS)
   const points=summaryLines(card.summary)
-  const isClipped=clippedIds.has(index), dive=deepdives[index], isYT=result.source_type==='youtube'
+  const isClipped=clippedIds.has(index), dive=deepdives[index], isYT=result.source_type==='youtube'||result.source_type==='bilibili'
   // 舊的工作階段（localStorage）沒有 content_type，defaultTrack 會退回 study
   const suggestedTrack=defaultTrack(result.content_type,hasCode(cards))
   const sourceKey=result.transcript_source&&TRANSCRIPT_SOURCE_KEYS[result.transcript_source]
@@ -27,11 +27,11 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
     <section className={`deck ${fullWidth?'deck-full':''}`}>
       <div className="deck-head">
         <h2 className="deck-title">{result.title}</h2>
-        {result.model_used&&<span className="model-badge" title={t('deck.modelTitle')}>{result.model_used}{result.segments>1?t('deck.segments',result.segments):''}</span>}
-        {sourceKey&&<span className="model-badge" title={t('deck.sourceTitle')}>{t(sourceKey)}</span>}
+        {developerMode&&result.model_used&&<span className="model-badge" title={t('deck.modelTitle')}>{result.model_used}{result.segments>1?t('deck.segments',result.segments):''}</span>}
+        {developerMode&&sourceKey&&<span className="model-badge" title={t('deck.sourceTitle')}>{t(sourceKey)}</span>}
         <span className="deck-count">{t('deck.count',index+1,cards.length)}</span>
         {/* 實作的對象是整支影片，不是單張卡——所以按鈕在標題列，不在卡片上 */}
-        <button className="btn-implement" onClick={onImplement} title={t('implement.ctaTitle')}>{t(`implement.cta.${suggestedTrack}`)}</button>
+        {developerMode&&<button className="btn-implement" onClick={onImplement} title={t('implement.ctaTitle')}>{t(`implement.cta.${suggestedTrack}`)}</button>}
       </div>
       {/* 重點導覽常駐頂部，不必捲到底才能切換 */}
       <div className="deck-nav deck-nav-top">

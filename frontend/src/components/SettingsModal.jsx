@@ -13,7 +13,7 @@ const ENGINES = [
 
 // state: 後端 /settings 回傳的公開狀態
 // mandatory: 首次啟動（尚未設定任何金鑰）→ 不可關閉，作為導引畫面
-export default function SettingsModal({ state, mandatory, onClose, onSaved }) {
+export default function SettingsModal({ state, mandatory, onClose, onSaved, developerMode=false, onDeveloperModeChange }) {
   const { t, lang, setLang, langs } = useI18n()
   const [keys, setKeys] = useState({})   // 只放使用者「這次有輸入」的金鑰
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
@@ -30,10 +30,9 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved }) {
     setErr('')
     const payload = {
       // 金鑰：留空代表「維持原本設定」，只送有輸入的
-      ...Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
+      ...(developerMode ? Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])) : {}),
       // 這些總是送出（清空即代表停用）
-      obsidian_vault_path: vault.trim(),
-      obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
+      ...(developerMode ? {obsidian_vault_path: vault.trim(), obsidian_notes_folder: folder.trim() || 'Youtube Card Reader'} : {}),
       output_language: outputLanguage,
     }
     setSaving(true)
@@ -69,6 +68,16 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved }) {
             <span className="settings-hint">{t('settings.uiLanguageHint')}</span>
           </label>
 
+          <div className="settings-divider"><span>{t('settings.modeSection')}</span></div>
+          <label className="settings-mode-toggle">
+            <span className="settings-mode-copy">
+              <strong>{t('settings.developerMode')}</strong>
+              <small>{t('settings.developerModeHint')}</small>
+            </span>
+            <input type="checkbox" role="switch" checked={developerMode}
+                   onChange={e => onDeveloperModeChange?.(e.target.checked)}/>
+          </label>
+
           <div className="settings-divider"><span>{t('settings.output')}</span></div>
           <label className="settings-field">
             <span className="settings-label">{t('settings.outputLanguage')}</span>
@@ -78,6 +87,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved }) {
             <span className="settings-hint">{t('settings.outputLanguageHint')}</span>
           </label>
 
+          {developerMode && <>
           <div className="settings-divider"><span>{t('settings.engines')}</span></div>
           {ENGINES.map(({ name, field, multiline }) => {
             const already = !!state?.[`${name}_set`]
@@ -117,6 +127,8 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved }) {
                    value={folder} onChange={e => setFolder(e.target.value)}
                    placeholder="Youtube Card Reader"/>
           </label>
+
+          </>}
 
           {err && <p className="settings-err">{err}</p>}
         </div>
