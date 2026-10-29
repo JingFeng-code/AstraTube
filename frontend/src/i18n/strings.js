@@ -58,6 +58,8 @@ export const STRINGS = {
     'input.needsKey': 'needs API key',
     'input.deepVisual': 'Read screen',
     'input.deepVisualTitle': 'Let Gemini read the slides and on-screen text too. Slower, uses more quota.',
+    'input.deepVisualBilibili': 'Read screen is not available for Bilibili videos yet; captions are analyzed instead.',
+    'input.deepVisualBilibiliShort': 'not for Bilibili',
     'input.go': 'Start',
     'input.running': 'Working…',
 
@@ -252,7 +254,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `Appended to: ${p}`,
     'toast.saveFailed': (m) => `Save failed: ${m}`,
     'toast.deepdiveFailed': (m) => `Deep dive failed: ${m}`,
-    'toast.segFailed': (n) => `Part ${n} failed and was skipped`,
+    'toast.segFailed': (n, reason) => `Part ${n} failed and was skipped${reason ? `: ${reason}` : ''}`,
 
     'error.generate': (m) => `Extraction failed: ${m}`,
     'error.noCards': 'Extraction failed: no cards were produced. Try again or switch models.',
@@ -323,6 +325,8 @@ export const STRINGS = {
     'input.needsKey': '需填金鑰',
     'input.deepVisual': '讀畫面',
     'input.deepVisualTitle': '讓 Gemini 同時讀畫面與簡報，速度較慢且會使用更多額度',
+    'input.deepVisualBilibili': 'Bilibili 影片目前不支援讀畫面，會改用字幕分析。',
+    'input.deepVisualBilibiliShort': 'Bilibili 不支援',
     'input.go': '開始',
     'input.running': '整理中',
 
@@ -517,7 +521,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `已附加到：${p}`,
     'toast.saveFailed': (m) => `存檔失敗：${m}`,
     'toast.deepdiveFailed': (m) => `深入解析失敗：${m}`,
-    'toast.segFailed': (n) => `第 ${n} 段生成失敗，已跳過`,
+    'toast.segFailed': (n, reason) => `第 ${n} 段生成失敗，已跳過${reason ? `：${reason}` : ''}`,
 
     'error.generate': (m) => `整理失敗：${m}`,
     'error.noCards': '整理失敗：沒有產生任何重點，請稍後再試或更換模型。',

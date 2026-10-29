@@ -16,7 +16,7 @@ import useImplement from './hooks/useImplement.js'
 import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
-import { isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual } from './utils/user-mode.js'
+import { isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
@@ -94,7 +94,7 @@ export default function App() {
   const { settings, needsSetup, setSettings } = useSettings()
   const stream = useSummarizeStream({
     initialResult: SAVED.result||null,
-    onSegError: ev=>showToast(t('toast.segFailed',ev.seg+1),true),
+    onSegError: ev=>showToast(t('toast.segFailed',ev.seg+1,typeof ev.error==='string'?ev.error.trim().slice(0,160):''),true),
     t,
   })
   const { result } = stream
@@ -117,13 +117,15 @@ export default function App() {
     showToast(t('toast.settingsSaved'))
   }
 
+  // Bilibili 不支援讀畫面：停用勾選框並說明原因（不改動使用者對 YouTube 的偏好設定）
+  const bilibiliUrl=isBilibiliUrl(url)
   const cards=result?.cards||[]
   const isBilibili=result?.source_type==='bilibili'&&!!result?.bilibili_video_id
   const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili
 
   async function handleSummarize(){
     cardsHook.resetForNewResult()
-    await stream.summarize(url,activeProvider,effectiveDeepVisual(developerMode,deepVisual))
+    await stream.summarize(url,activeProvider,effectiveDeepVisual(developerMode,deepVisual,url))
   }
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
   async function onDeepDive(i){try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
@@ -192,9 +194,9 @@ export default function App() {
                 ))}
               </select>
             </label>}
-            {developerMode&&<label className="deep-visual-toggle" title={t('input.deepVisualTitle')}>
-              <input type="checkbox" checked={deepVisual} onChange={e=>setDeepVisual(e.target.checked)}/>
-              <span><strong>{t('input.deepVisual')}</strong></span>
+            {developerMode&&<label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
+              <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
+              <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
             </label>}
             <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
           </section>
