@@ -12,25 +12,10 @@
     "withGlobalTauri": true,
     "security": {
       "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; frame-src http://astraplayer.localhost astraplayer://localhost https://www.youtube.com https://www.youtube-nocookie.com https://player.bilibili.com; object-src 'none'; base-uri 'self'"
-    },
-    "windows": [
-      {
-        "label": "main",
-        "title": "AstraTube · AI 影片學習",
-        "width": 1280,
-        "height": 850,
-        "minWidth": 850,
-        "minHeight": 600,
-        "resizable": true,
-        "fullscreen": false
-      }
-    ]
+    }
   },
   "bundle": {
-    "active": true,
-    "targets": [
-      "nsis"
-    ],
+    "active": false,
     "externalBin": [
       "binaries/astratube-backend"
     ],

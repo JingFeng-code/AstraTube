@@ -1,49 +1,84 @@
-# AstraTube Windows 桌面版 Alpha
+# AstraTube Windows 免安裝版 Alpha
 
-這是 **Tauri v2 + React + FastAPI PyInstaller Sidecar** 的**內部測試安裝包**；不是已完成實際影片、Ollama 或跨裝置驗收的正式公開產品。原本 Web／Codespaces 版維持可使用。
+這是 **Tauri v2 + React + FastAPI PyInstaller Sidecar** 的**內部測試版**，以**免安裝（Portable）資料夾**發行：解壓縮後直接執行，不需要安裝程式，也不需要安裝 Python／Node.js。它尚未完成實際影片、Ollama 或跨裝置驗收，不是正式公開產品。Web／Codespaces 版維持可使用。
 
-## 目前的架構
+## 資料夾內容
 
-- Tauri 負責 Windows 桌面視窗及後端 Sidecar 啟停，關閉程式後會停止由它啟動的 FastAPI 行程；Sidecar 也會每 2 秒確認桌面程式仍在，桌面程式當掉或被強制結束時自行退出（CI 以打包後的 exe 自動驗證，Windows 實機仍待驗收）。
-- React 依然使用現有的字幕、影片摘要、知識卡、Obsidian、Ollama 及 AI 問答畫面。
-- FastAPI 以 PyInstaller 包裝成獨立 `astratube-backend.exe`，**安裝後一般使用者不需要自己安裝 Python/Node.js**。
-- 每次啟動由 Rust 選擇回環位址上的隨機埠，產生新的高熵會話 Token；桌面 React 啟動時經 Tauri invoke 取得本次 Token，所有 API 請求都要帶 `X-Astra-Desktop-Token`。
-- FastAPI 只監聽 `127.0.0.1`，不會監聽 `0.0.0.0`。遠端網頁不能因為得知埠號就無認證呼叫本機 API；後端另外檢查 Host 與 Origin，其他網站即使猜到 Token 也會被拒絕。
-- 桌面模式的 `settings.json` 與 `.cache/` 會存在**目前 Windows 使用者的應用程式資料目錄**（由 Tauri `app_data_dir` 指定），不寫進安裝資料夾或 Git。
-- Tauri 不提供任意 shell 命令權限給網頁介面。Coding Agent 自動執行仍預設關閉。
-- 主視窗不載入任何第三方腳本（CSP `script-src 'self'`）。YouTube 官方播放器 API 改在獨立來源 `http://astraplayer.localhost` 的 iframe 內執行，拿不到 Tauri IPC 與後端 Token；詳見 [桌面版 YouTube 播放器隔離說明](DESKTOP_PLAYER_ISOLATION.zh-TW.md)。
+```
+AstraTube-Portable\
+  AstraTube.exe              主程式
+  astratube-backend.exe      背景服務（由主程式自動啟動與關閉）
+  README-使用說明.txt         給使用者的簡短說明
+  LICENSE.txt、THIRD_PARTY_NOTICES.md
+  data\                      第一次執行時建立
+    app\                     設定（settings.json，含 API Key）、匯入字幕、翻譯與逐字稿快取
+    webview\                 WebView2 瀏覽資料
+```
+
+- **所有使用者資料都在 `data` 資料夾**，不寫入 `%APPDATA%`／`%LOCALAPPDATA%`。整個資料夾可以搬到別台電腦或 USB；刪除資料夾就完全清除。
+- **PyInstaller 的暫存檔例外**：背景服務是單一 exe，執行時會解壓到系統暫存資料夾（`%TEMP%\_MEI…`），正常結束後自動清除，不含使用者資料。
+- **要放在可以寫入的位置**，例如「文件」、「桌面」或 USB。放在 `C:\Program Files` 這類需要系統管理員權限的位置時，程式仍會開啟，但會說明原因並請你移動資料夾，不會啟動背景服務。
+- **更新**：解壓新版，把舊版的 `data` 資料夾複製到新版資料夾，再開新版的 `AstraTube.exe`。
+- **從舊安裝版搬資料（選用）**：舊安裝版的資料在 `%APPDATA%\dev.jingfeng.astratube`。若要沿用設定與匯入字幕，把其中的內容複製到免安裝版的 `data\app`。注意其中含有 API Key。
+
+## 架構與安全
+
+- **背景服務的生命週期**：Tauri 主程式從自己所在的資料夾啟動 `astratube-backend.exe`，並告訴它資料要存在 `data\app`。正常關閉時，主程式會停止背景服務；主程式當掉或被強制結束時，背景服務每 2 秒確認主程式是否還在，不在就自行結束。
+- **WebView2 資料**：主視窗在程式中建立並指定 `data\webview`。Tauri 預設會把這些資料寫到 `%LOCALAPPDATA%`，設定檔裡的相對路徑也只會落在那裡，所以在程式碼中指定絕對路徑。
+- **連線與 Token**：每次啟動在回環位址選隨機埠，並產生新的高熵 Token；所有 API 請求都要帶 `X-Astra-Desktop-Token`。後端只監聽 `127.0.0.1`，並檢查 Host 與 Origin，其他網站即使猜到 Token 也會被拒絕。
+- **網頁介面的權限**：Tauri 不提供任意 shell 指令權限給網頁介面。Coding Agent 自動執行強制關閉。
+- **第三方腳本隔離**：主視窗不載入任何第三方腳本（CSP `script-src 'self'`）。YouTube 播放器 API 在獨立來源 `http://astraplayer.localhost` 的 iframe 內執行，拿不到 Tauri IPC 與後端 Token；詳見 [桌面版 YouTube 播放器隔離說明](DESKTOP_PLAYER_ISOLATION.zh-TW.md)。
+
+## 需要的環境
+
+- Windows 10／11 64 位元。
+- **Microsoft Edge WebView2 Runtime**：Windows 11 與大多數 Windows 10 已內建。免安裝版無法替你安裝；若視窗空白或無法開啟，請從[微軟官網](https://developer.microsoft.com/microsoft-edge/webview2/)安裝 WebView2 Runtime。
 
 ## 目前不包含什麼？
 
-- **Whisper / yt-dlp 不會封裝到第一版 Windows Sidecar**，因為它們依賴大型的原生組件及模型；無公開字幕的影片可先使用自己合法取得的 SRT／VTT。這是有意識的 Alpha 範圍限制，不代表未來會永久取消。
-- Tauri 介面目前是網頁原型的桌面外殼，不是完整新的 Windows UX。
-- 對於外部免費模型、YouTube/Bilibili API、嵌入播放器的可用性，仍**不保證**所有地區／影片都能成功。
-- 尚未測試 Windows 10/11 不同電腦、WebView2、GPU、Ollama/Whisper、Unicode 路徑、NSIS 安裝或解除安裝流程。
-- 尚未設定程式碼簽章、自動更新、隱私與開源授權合規審查；不得用此版本宣稱已可正式公開發布。
-- 使用 Tauri 的 Windows 桌面程式必須符合 WebView2 執行環境的部署需求。
+- **不含 Whisper／yt-dlp**：沒有公開字幕的影片，可匯入你合法持有的 SRT／VTT。
+- **沒有數位簽章與自動更新**：第一次執行可能出現「Windows 已保護您的電腦」。不要為此關閉防毒軟體。
+- **可用性沒有保證**：外部免費模型、YouTube／Bilibili 字幕與嵌入播放器，不保證在所有地區、所有影片都能成功。
+- **尚未在多台 Windows 10／11 實機驗收**。
 
-## 從 GitHub 取得內部測試安裝檔
+## 從 GitHub 取得測試版
 
 1. 打開儲存庫的 **Actions → Windows desktop alpha**。
-2. 選擇一筆**成功**的工作流程執行紀錄。
-3. 在頁面下方的 Artifacts 下載 `AstraTube-Windows-x64-alpha-unsigned`。這是 ZIP，裡面包含**未簽章的 NSIS 安裝程式**。
-4. 只有在了解這是自己的開發版、來源可信且準備測試時才安裝。請勿透過不明網站轉載，也不要為了安裝而關閉 Windows 防毒或安全機制。
-5. 安裝後先測試一支合法的公開字幕影片；再測試 SRT／VTT 匯入、免費模型、翻譯、Ollama 及關閉軟體後行程是否正常結束。測試失敗記錄影片類型、錯誤訊息與系統版本。
+2. 選擇一筆**成功**的執行紀錄。
+3. 在頁面下方 Artifacts 下載 `AstraTube-Windows-x64-portable-unsigned`。下載的 ZIP 解壓縮後就是可直接執行的資料夾。
+4. 只有在了解這是開發版、來源可信時才執行。請勿透過不明網站轉載。
 
-下載 Actions Artifacts 可能需要登入有權限的 GitHub 帳號；這不是 GitHub Release 公開下載頁。
+下載 Actions Artifacts 需要登入有權限的 GitHub 帳號；這不是公開的 Release 下載頁。
+
+## 自動化測試（CI）
+
+Windows workflow 每次會依序：
+1. 封裝背景服務並做後端冒煙測試：Token、來源檢查、主程式消失後自行結束。
+2. 編譯主程式並組出免安裝資料夾。
+3. 執行 `scripts/smoke_portable.ps1`，啟動**真正的主程式**：
+   - 放在含中文與空白的路徑也能執行。
+   - 背景服務只監聽 `127.0.0.1`。
+   - 資料只寫在 `data`，沒有寫入 `%APPDATA%`／`%LOCALAPPDATA%`。
+   - 正常關閉與強制結束後，都沒有殘留背景服務。
+   - 資料夾無法寫入時不啟動背景服務，但視窗仍會開啟。
+4. 執行 Rust 單元測試。
+
+這些都是自動化測試，不等於 Windows 實機驗收；實機步驟見 [MANUAL_SMOKE_TEST.zh-TW.md](MANUAL_SMOKE_TEST.zh-TW.md)。
 
 ## 開發者在 Windows 編譯
 
-需要 Windows x64、Python 3.12、Node.js 20+、Rust stable（MSVC 工具鏈）、Microsoft C++ Build Tools、WebView2 工具鏈、網路連線。
+需要 Windows x64、Python 3.12、Node.js 20+、Rust stable（MSVC 工具鏈）、Microsoft C++ Build Tools、網路連線。
 
 ```powershell
-git checkout main
-git pull origin main
 ./scripts/build-desktop.ps1
 ```
 
-編譯腳本會安裝 PyInstaller 等開發依賴、產生測試版圖示、封裝 FastAPI、在本機以 Token 做 Sidecar 健康檢查，再編譯 React 與 NSIS 安裝程式。
+```powershell
+./scripts/smoke_portable.ps1 -PortableDir desktop/portable/AstraTube-Portable
+```
 
-**安全提醒：** 這個 Alpha 是**單機自用桌面架構**。不要直接將內部 FastAPI 暴露到網際網路；若將來提供雲端多人版，仍需要獨立的登入、資料隔離、伺服器授權及費用限制。
+產出：`desktop/portable/AstraTube-Portable/` 資料夾，以及 `desktop/portable/AstraTube-Portable-x64.zip`。
 
-官方技術文件：[Tauri Sidecar](https://v2.tauri.app/develop/sidecar/) · [Tauri Windows 安裝](https://v2.tauri.app/distribute/windows-installer/)。
+**安全提醒：** 這是**單機自用桌面架構**。不要把內部 FastAPI 暴露到網際網路；若將來提供雲端多人版，需要另外的登入、資料隔離、伺服器授權與費用限制。
+
+官方技術文件：[Tauri Sidecar](https://v2.tauri.app/develop/sidecar/) · [WebView2 Runtime 部署](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)。

@@ -1,6 +1,6 @@
 # AstraTube Beta 發布門檻
 
-本文件定義「可以邀請少量一般使用者測試（Beta）」前必須達成的條件。**Beta 不是正式公開發布**，安裝檔仍只透過私下管道提供給知情的測試者。
+本文件定義「可以邀請少量一般使用者測試（Beta）」前必須達成的條件。**Beta 不是正式公開發布**，測試版仍只透過私下管道提供給知情的測試者。
 
 ## 1. 目前狀態（2026-10-29）
 
@@ -12,7 +12,7 @@
 
 驗收層級必須分開記錄，不能互相代替：
 
-1. **安裝檔成功產出**：Windows workflow 綠燈並上傳 Artifact。
+1. **免安裝版成功產出**：Windows workflow 綠燈並上傳 Artifact；CI 內也會啟動真正的主程式，檢查資料位置與關閉後無殘留（`scripts/smoke_portable.ps1`）。
 2. **Sidecar smoke test 通過**：打包後的後端能啟動、Token 與來源檢查有效、啟動程式消失後會自行結束（CI 內自動執行）。
 3. **完整桌面操作通過**：真人在 Windows 10／11 依 [MANUAL_SMOKE_TEST.zh-TW.md](MANUAL_SMOKE_TEST.zh-TW.md) 操作並留下紀錄。**目前尚無任何一筆。**
 
@@ -23,19 +23,19 @@
 - [x] 其他網站不能讀寫本機 API（Web 模式 Origin／Host 檢查；桌面 Token）
 - [x] 一般模式與 Ollama 不會默默改用付費或雲端模型
 - [x] Coding Agent 自動執行預設關閉，桌面版強制關閉
-- [ ] 安裝檔有程式碼簽章（避免教使用者忽略 SmartScreen）
-- [ ] 隨安裝檔附上第三方授權清單（Python、PyInstaller、Tauri、WebView2、Python 套件）
+- [ ] 執行檔有程式碼簽章（避免教使用者忽略 SmartScreen）
+- [ ] 隨免安裝版附上完整第三方授權清單（Python、PyInstaller、Tauri、WebView2、Python 套件）
 - [ ] 一頁式隱私說明：哪些資料留在本機（設定、字幕、快取位置）、哪些會送到外部（YouTube／Bilibili 字幕、免費模型服務、使用者自填的雲端 API）
 
 ### Windows 桌面可靠性
 
 - [x] 啟動程式消失後後端自行結束（CI 自動驗證打包 exe）
 - [x] 設定檔原子寫入，不會因當機清空
-- [ ] Windows 11 實機：安裝 → 首次啟動 → 關閉 → 工作管理員確認沒有 `astratube-backend.exe`
+- [ ] Windows 11 實機：解壓縮 → 首次啟動 → 關閉 → 工作管理員確認沒有 `astratube-backend.exe`
 - [ ] Windows 10 實機（WebView2 可能需自行安裝）同上
-- [ ] 使用者名稱含中文或空白時可正常啟動與存檔
-- [ ] 覆蓋安裝（升級）後設定與匯入字幕仍在
-- [ ] 解除安裝時清楚說明資料是否保留；選擇刪除後 `%APPDATA%\dev.jingfeng.astratube` 確實清除
+- [ ] 資料夾路徑含中文或空白、搬到 USB 後可正常啟動與存檔（CI 已自動測試中文與空白路徑）
+- [ ] 換新版並複製 `data` 資料夾後，設定與匯入字幕仍在
+- [ ] 刪除資料夾後不留任何設定；`%APPDATA%`／`%LOCALAPPDATA%` 沒有 AstraTube 資料（CI 已自動檢查）
 - [ ] 加入單一實例限制，或實測確認開兩次不會損壞資料
 
 ### 主要流程（一般模式，不需任何 API Key）
@@ -57,11 +57,11 @@
 
 ## 3. Windows 與 Web 版差異
 
-| 項目 | Windows 桌面 Alpha | Web／Codespaces |
+| 項目 | Windows 免安裝版 Alpha | Web／Codespaces |
 |---|---|---|
 | 需要 Python／Node | 不需要（已打包） | 需要 |
 | 後端存取控制 | 每次啟動隨機 Token ＋ 來源檢查 | 來源檢查（只限本機頁面與目前 Codespace） |
-| 資料位置 | `%APPDATA%\dev.jingfeng.astratube\`（`settings.json`、`.cache\`） | 專案根目錄的 `settings.json`、`.cache/` |
+| 資料位置 | 程式旁的 `data\app`（`settings.json`、`.cache\`）與 `data\webview` | 專案根目錄的 `settings.json`、`.cache/` |
 | 無字幕影片 | 只能匯入 SRT／VTT（未內建 Whisper／yt-dlp） | 可走本機 Whisper（需安裝完整 `requirements.txt`） |
 | Ollama | 同一台電腦的 `127.0.0.1:11434` | 只能連到後端所在環境；Codespaces 連不到你電腦上的 Ollama |
 | Coding Agent 自動執行 | 強制關閉 | 預設關閉，可用 `.env` 開啟（不建議） |
@@ -70,7 +70,7 @@
 ## 4. 目前阻擋 Beta 的事項（依優先順序）
 
 1. **沒有任何 Windows 實機驗收紀錄**——請依 [MANUAL_SMOKE_TEST.zh-TW.md](MANUAL_SMOKE_TEST.zh-TW.md) 至少在一台 Windows 11 完成並保存結果。
-2. **未簽章安裝檔**——一般使用者會看到「Windows 已保護您的電腦」。
-3. **第三方授權清單與隱私說明**尚未隨安裝檔提供。
+2. **未簽章執行檔**——一般使用者會看到「Windows 已保護您的電腦」。
+3. **完整第三方授權清單與隱私說明**尚未隨免安裝版提供。
 4. **建置不可重現**（沒有 `Cargo.lock`、Tauri CLI 與 Python 套件未鎖版本）——Beta 期間回報的問題可能無法用同一份原始碼重現。
 5. **首次使用引導不足**——非工程師打開後只看到標語與輸入框。

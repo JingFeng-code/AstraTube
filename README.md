@@ -2,7 +2,7 @@
 
 個人使用的 AI 影片學習與實作工作台。以 [YouTube Card Reader](https://github.com/chang416/youtube-card-reader) 為基底，目標是保留既有影片知識卡、影片問答、Obsidian 匯出與 Codex / Claude Code 任務產生功能，逐步加入台灣繁體中文體驗、Ollama 與同步雙語字幕。
 
-> **專案狀態：持續開發中的 Web App**。目前已加入雙語逐句字幕、Ollama 供應商、SRT／VTT 匯入等程式功能，GitHub Actions 提供回歸測試；尚未完成真實影片的瀏覽器驗收、Windows 安裝程式或公開多人服務所需的安全控管。
+> **專案狀態：持續開發中的 Web App**。目前已加入雙語逐句字幕、Ollama 供應商、SRT／VTT 匯入等程式功能，GitHub Actions 提供回歸測試；尚未完成真實影片的瀏覽器驗收、Windows 實機驗收或公開多人服務所需的安全控管。
 
 ## 影片字幕閱讀（第一版）
 
@@ -34,9 +34,9 @@ AstraTube 現在預設使用**一般使用者模式**：不需要先設定 API �
 
 在同一台電腦啟動 Ollama，於 **設定 → 開發者模式 → Ollama 本地 AI** 設定本機網址及模型。設定畫面會自動列出已安裝的模型供下拉選擇；再從分析畫面的模型選單選擇 `ollama:<模型>`，即可使用本地模型產生摘要、知識卡與影片問答。本功能不需要 API Key，且**不會自動改用付費雲端模型**。目前限定同環境的回環介面 11434 埠；**Codespaces 無法直接連線到你 Windows 電腦的 Ollama**。字幕逐句翻譯在開發者模式也可以選擇已安裝的 Ollama 模型；一般模式依然預設免費線上模型。詳見 [Ollama 開發指南](docs/OLLAMA.zh-TW.md)。
 
-## Windows 桌面版 Alpha（測試專用）
+## Windows 免安裝版 Alpha（測試專用）
 
-AstraTube 已新增 Tauri v2 + FastAPI Sidecar 的 Windows 桌面架構與自動化建置流程。安裝包的目標是不要求一般使用者自行安裝 Python／Node.js，但**尚未完成 Windows 實機使用驗收、數位簽章及對外發布**。請參閱 [Windows 桌面版開發／測試指南](docs/DESKTOP.zh-TW.md)。
+Windows 版以**免安裝資料夾**發行：解壓縮後雙擊 `AstraTube.exe` 即可，不需要安裝程式、Python 或 Node.js；設定與快取都存在程式旁的 `data` 資料夾，整個資料夾可以搬移或直接刪除。**尚未完成 Windows 實機使用驗收、數位簽章及對外發布**。請參閱 [Windows 桌面版開發／測試指南](docs/DESKTOP.zh-TW.md)。
 
 ## 快速開始：GitHub Codespaces
 

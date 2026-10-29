@@ -17,28 +17,29 @@
 |---|---|---|
 | A1 | | |
 
-同時記下：Windows 版本（設定 → 系統 → 關於）、測試日期、安裝檔是從哪一次 GitHub Actions 下載的（網址）。
+同時記下：Windows 版本（設定 → 系統 → 關於）、測試日期、免安裝版是從哪一次 GitHub Actions 下載的（網址）。
 
 ---
 
-## A. 安裝與啟動
+## A. 取得、啟動與關閉（免安裝版）
 
-**A1　下載安裝檔**
+**A1　下載**
 1. 到 GitHub 儲存庫 → **Actions** → **Windows desktop alpha** → 點最新一筆綠色勾勾的紀錄。
-2. 頁面最下方 **Artifacts** 下載 `AstraTube-Windows-x64-alpha-unsigned`，解壓縮得到 `.exe`。
+2. 頁面最下方 **Artifacts** 下載 `AstraTube-Windows-x64-portable-unsigned`。
+3. 解壓縮到「文件」或「桌面」，例如 `文件\AstraTube 測試`。
 
-應該看到：一個名稱含 `AstraTube` 與 `setup` 的安裝程式。
+應該看到：資料夾裡有 `AstraTube.exe`、`astratube-backend.exe`、`README-使用說明.txt`、`LICENSE.txt`、`THIRD_PARTY_NOTICES.md`，**沒有**安裝程式。
 
-**A2　安裝**
-1. 雙擊安裝程式。若出現「Windows 已保護您的電腦」，這是因為尚未簽章：只有在確認檔案是自己從上面步驟下載的情況下，才按「其他資訊 → 仍要執行」。**不要關閉防毒軟體。**
-2. 依畫面完成安裝。
+**A2　第一次執行**
+1. 雙擊 `AstraTube.exe`。若出現「Windows 已保護您的電腦」，這是因為尚未簽章：只有在確認檔案是自己從上面步驟下載的情況下，才按「其他資訊 → 仍要執行」。**不要關閉防毒軟體。**
 
-應該看到：開始功能表出現 AstraTube。
+應該看到：10 秒內出現 AstraTube 視窗與網址輸入框，**沒有**黑色命令列視窗，也**沒有**要求安裝 Python、Node.js 或任何安裝步驟。
 
-**A3　第一次啟動**
-1. 從開始功能表開啟 AstraTube。
+**A3　資料存在程式旁**
+1. 回到資料夾。
+2. 在檔案總管網址列分別輸入 `%APPDATA%\dev.jingfeng.astratube` 與 `%LOCALAPPDATA%\dev.jingfeng.astratube`。
 
-應該看到：10 秒內出現 AstraTube 視窗與網址輸入框，**沒有**黑色命令列視窗，也**沒有**要求安裝 Python 或 Node.js。
+應該看到：資料夾裡多了 `data\app` 與 `data\webview`；兩個 `%APPDATA%`／`%LOCALAPPDATA%` 位置都**不存在**（若之前裝過舊安裝版，記錄修改時間是否在這次測試之前）。
 
 **A4　關閉後沒有殘留**
 1. 關閉 AstraTube 視窗。
@@ -55,9 +56,15 @@
 應該看到：`astratube-backend.exe` 在 10 秒內自動消失。
 
 **A6　連續開兩次**
-1. 開啟 AstraTube，不要關，再從開始功能表開一次。
+1. 開啟 AstraTube，不要關，再雙擊一次 `AstraTube.exe`。
 
 記錄：出現幾個視窗？兩個視窗都能用嗎？全部關閉後工作管理員是否乾淨？
+
+**A7　放在無法寫入的位置**（選做，需要系統管理員權限才能複製）
+1. 把整個資料夾複製到 `C:\Program Files\AstraTube 測試`。
+2. 以一般方式（不要「以系統管理員身分執行」）雙擊其中的 `AstraTube.exe`。
+
+應該看到：視窗開啟並說明「無法在程式所在位置建立資料夾」與建議的位置；工作管理員裡**沒有** `astratube-backend.exe`。測完刪除這個資料夾。
 
 ---
 
@@ -173,19 +180,25 @@
 
 應該看到：成功。
 
-**E3　中文與空白路徑**（若有另一個中文名稱的 Windows 帳號）
-1. 用該帳號登入，重做 A3、B1、B6。
+**E3　中文與空白路徑、搬移**
+1. 關閉 AstraTube，把整個資料夾改名為 `AstraTube 可攜 測試`，並搬到另一個位置（例如桌面或 USB 隨身碟）。
+2. 再開啟，重做 B1、B6。
 
-**E4　覆蓋安裝**
-1. 從 Actions 下載較新的安裝檔，直接安裝（不先移除）。
+應該看到：可以正常啟動；之前的設定、匯入字幕與已翻譯字幕都還在（跟著 `data` 資料夾一起搬過來）。
 
-應該看到：設定與匯入字幕仍在。
+**E4　更新到新版**
+1. 從 Actions 下載較新的免安裝版，解壓縮到新資料夾。
+2. 關閉舊版，把舊版的 `data` 資料夾複製到新版資料夾。
+3. 開啟新版的 `AstraTube.exe`。
 
-**E5　解除安裝**
-1. 設定 → 應用程式 → AstraTube → 解除安裝。記錄是否有「刪除應用程式資料」選項、你選了什麼。
-2. 開啟檔案總管，網址列輸入 `%APPDATA%\dev.jingfeng.astratube`。
+應該看到：設定、匯入字幕仍在。
 
-應該看到：與你的選擇一致（選刪除則資料夾不存在）。工作管理員沒有 `astratube-backend.exe`。
+**E5　移除**
+1. 關閉 AstraTube，刪除整個資料夾。
+2. 工作管理員確認沒有 `astratube-backend.exe`。
+3. 檔案總管網址列輸入 `%APPDATA%\dev.jingfeng.astratube` 與 `%LOCALAPPDATA%\dev.jingfeng.astratube`。
+
+應該看到：都不存在（不會留下任何設定）。
 
 ---
 
