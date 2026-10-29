@@ -4,6 +4,12 @@
 
 > **專案狀態：階段 0（開源基底匯入 + Codespaces 開發設定）**。雙語逐句字幕、Ollama 專用設定、VideoToNo 整合尚未完成，請勿視為現有功能。
 
+## Bilibili 公開字幕分析（MVP）
+
+輸入 B 站完整影片網址，例如 `https://www.bilibili.com/video/BV1B7411m7LV/`，若要指定分 P，可使用 `?p=2`。目前只分析可匿名取得的字幕；其餘經由已有的知識卡、繁體中文摘要、問答與 Markdown 功能處理。
+
+B 站影片使用官方嵌入播放器，可透過知識卡跳至時間戳；部分影片可能禁止站外播放。無公開字幕、需要登入才能讀取字幕的影片會顯示原因，不嘗試繞過權限或下載影音。B 站深視覺分析、短網址與一次批次分析所有分 P 尚不支援。完整端到端驗收仍待在 Codespaces 操作。
+
 ## 快速開始：GitHub Codespaces
 
 1. 在 GitHub 的 **Code → Codespaces → Create codespace** 建立開發環境。
