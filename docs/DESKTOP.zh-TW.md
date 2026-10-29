@@ -11,6 +11,7 @@
 - FastAPI 只監聽 `127.0.0.1`，不會監聽 `0.0.0.0`。遠端網頁不能因為得知埠號就無認證呼叫本機 API；後端另外檢查 Host 與 Origin，其他網站即使猜到 Token 也會被拒絕。
 - 桌面模式的 `settings.json` 與 `.cache/` 會存在**目前 Windows 使用者的應用程式資料目錄**（由 Tauri `app_data_dir` 指定），不寫進安裝資料夾或 Git。
 - Tauri 不提供任意 shell 命令權限給網頁介面。Coding Agent 自動執行仍預設關閉。
+- 主視窗不載入任何第三方腳本（CSP `script-src 'self'`）。YouTube 官方播放器 API 改在獨立來源 `http://astraplayer.localhost` 的 iframe 內執行，拿不到 Tauri IPC 與後端 Token；詳見 [桌面版 YouTube 播放器隔離說明](DESKTOP_PLAYER_ISOLATION.zh-TW.md)。
 
 ## 目前不包含什麼？
 

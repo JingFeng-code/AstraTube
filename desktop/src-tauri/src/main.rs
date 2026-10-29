@@ -7,6 +7,8 @@ use tauri::{Manager, State};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
 use uuid::Uuid;
 
+mod player;
+
 struct DesktopBackend {
     port: u16,
     token: String,
@@ -30,6 +32,8 @@ fn desktop_connection(state: State<'_, DesktopBackend>) -> DesktopConnection {
 fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        // YouTube 播放器宿主頁放在獨立來源，避免第三方腳本進入具有 IPC 的主視窗。
+        .register_uri_scheme_protocol(player::SCHEME, |_ctx, request| player::respond(&request))
         .invoke_handler(tauri::generate_handler![desktop_connection])
         .setup(|app| {
             // The port is selected by the OS; it is not a security boundary.
