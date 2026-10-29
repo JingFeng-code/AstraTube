@@ -9,6 +9,7 @@ from app.api.models import router as models_router
 from app.api.notes import router as notes_router
 from app.api.settings import router as settings_router
 from app.api.subtitles import router as subtitles_router
+from app.api.subtitle_import import router as subtitle_import_router
 from app.api.summarize import router as summarize_router
 
 app = FastAPI(title="Youtube Card Reader")
@@ -20,6 +21,7 @@ app.include_router(models_router)
 app.include_router(notes_router)
 app.include_router(settings_router)
 app.include_router(subtitles_router)
+app.include_router(subtitle_import_router)
 
 
 @app.get("/health")

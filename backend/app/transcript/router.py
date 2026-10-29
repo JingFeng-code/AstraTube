@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 from app.llm import gemini
 from app.services.article_fetcher import fetch_article
-from app.transcript import bilibili, captions, deepsrt, whisper_local
+from app.transcript import bilibili, captions, deepsrt, whisper_local, imported_subtitles
 
 
 class Content(TypedDict):
@@ -87,6 +87,13 @@ def route_content(url: str, deep_visual: bool = False) -> Content:
         if deep_visual:
             raise ValueError("Bilibili 尚不支援深視覺分析，請關閉「讀取畫面」後重試。")
         bvid, page = bili
+        uploaded = imported_subtitles.load("bilibili", bvid, page)
+        if uploaded:
+            result = _pack("bilibili", bvid,
+                           imported_subtitles.transcript_from_cues(uploaded["cues"]),
+                           uploaded["is_chinese"], "imported_subtitles")
+            result["bilibili_page"] = page
+            return result
         text, is_chinese = bilibili.fetch_transcript(bvid, page)
         result = _pack("bilibili", bvid, text, is_chinese, "bilibili_captions")
         result["bilibili_page"] = page
@@ -97,6 +104,11 @@ def route_content(url: str, deep_visual: bool = False) -> Content:
 
     video_id = captions.extract_video_id(url)
     if video_id:
+        uploaded = imported_subtitles.load("youtube", video_id, 1)
+        if uploaded and not deep_visual:
+            return _pack("youtube", video_id,
+                         imported_subtitles.transcript_from_cues(uploaded["cues"]),
+                         uploaded["is_chinese"], "imported_subtitles")
         return _youtube(url, video_id, deep_visual)
 
     try:

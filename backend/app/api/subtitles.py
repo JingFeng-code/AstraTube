@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from app.transcript import bilibili, cache, captions, translation_cache, subtitle_translation
+from app.transcript import bilibili, cache, captions, translation_cache, subtitle_translation, imported_subtitles
 from app.llm import opencode
 
 router = APIRouter(prefix="/subtitles", tags=["subtitles"])
@@ -59,7 +59,17 @@ def get_subtitles(
     translation_provider: str = "opencode",
 ) -> dict:
     """只接受影片識別碼；不接受任意外部 URL，以免變成網路代理。"""
-    if platform == "youtube":
+    try:
+        imported_subtitles.validate_identity(platform, video_id, page)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    imported = imported_subtitles.load(platform, video_id, page)
+    if imported:
+        cues = [dict(cue) for cue in imported["cues"]]
+        is_chinese = imported["is_chinese"]
+        source = "imported"
+        timing_precision = "milliseconds_original"
+    elif platform == "youtube":
         if not _YOUTUBE_ID.fullmatch(video_id):
             raise HTTPException(400, "YouTube 影片 ID 格式不正確。")
         try:
@@ -70,7 +80,7 @@ def get_subtitles(
             if not local:
                 raise HTTPException(404, "這支影片目前沒有可讀取的字幕。")
             text, is_chinese = local
-    else:
+    elif not imported:
         if not _BILIBILI_ID.fullmatch(video_id):
             raise HTTPException(400, "Bilibili BV 影片 ID 格式不正確。")
         try:
@@ -78,7 +88,10 @@ def get_subtitles(
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
 
-    cues = parse_timed_cues(text)
+    if not imported:
+        cues = parse_timed_cues(text)
+        source = "platform"
+        timing_precision = "seconds_estimated"
     if not cues:
         raise HTTPException(404, "逐字稿沒有可顯示的時間戳字幕。")
     # 讀取本機已有的譯文，不觸發 AI API；切換影片或重新開啟時不需重複付費或運算。
@@ -92,6 +105,7 @@ def get_subtitles(
         if cue["translation"]:
             translated_count += 1
     return {
+        "source": source,
         "translated_count": translated_count,
         "translation_provider": translation_provider,
         "platform": platform,
@@ -101,7 +115,7 @@ def get_subtitles(
         "cues": cues,
         "translation_status": ("complete" if translated_count == len(cues) else
                                "partial" if translated_count else "not_available"),
-        "timing_precision": "seconds_estimated",
+        "timing_precision": timing_precision,
     }
 
 
