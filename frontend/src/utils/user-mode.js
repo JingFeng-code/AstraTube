@@ -1,5 +1,6 @@
 // 使用者模式只控制介面可見性，不是 API 授權機制。
-export const DEFAULT_FREE_PROVIDER = 'opencode:deepseek-v4-flash-free'
+// free：後端只在 OpenCode 免費模型之間接力（單一免費模型會無預警下架），絕不改用付費供應商。
+export const DEFAULT_FREE_PROVIDER = 'free'
 
 export function isDeveloperModeSetting(value) {
   return value === '1'

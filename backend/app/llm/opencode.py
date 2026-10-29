@@ -39,8 +39,18 @@ AUTO_CHAIN: tuple[str, ...] = (
     "nemotron-3-ultra-free",
 )
 
+# 不適合摘要的免費模型（見上方說明）：接力時跳過，只留給使用者在開發者模式手動選
+_NOT_FOR_RELAY = frozenset({
+    "laguna-s-2.1-free", "ling-3.0-flash-free", "ling-3.0-tiny-free", "north-mini-code-free",
+})
+
 _MODELS_TTL = 3600.0  # 模型清單記憶體快取 1 小時
 _models_cache: tuple[float, list[str], str] | None = None
+
+# 免費模型會無預警下架或暫停（例如 HTTP 400「Model is unavailable」）。
+# 回報「模型不可用」的模型先排到接力鏈最後，10 分鐘後再給它機會。
+_UNAVAILABLE_TTL = 600.0
+_unavailable: dict[str, float] = {}
 
 # 免費模型會做長篇推理，一次摘要實測可跑到 3 分鐘以上，讀取逾時要給足
 _CHAT_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=60.0, pool=15.0)
@@ -84,6 +94,13 @@ def list_free_models() -> Tuple[list[str], str]:
     return list(models), source
 
 
+def _says_model_unavailable(body: str) -> bool:
+    """回應是否表示「這個模型不能用」（下架、暫停、不存在），而不是請求本身有誤。"""
+    text = body.lower()
+    return "model" in text and any(h in text for h in (
+        "unavailable", "not found", "does not exist", "not supported", "disabled"))
+
+
 def _post_chat(model: str, chat_messages: list[dict]) -> str:
     """打一次 /chat/completions，回傳助手訊息內容。"""
     try:
@@ -97,7 +114,11 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
         raise connect_error("OpenCode", e)
 
     if resp.status_code >= 400:
-        raise http_error("OpenCode", resp.status_code, resp.text)
+        error = http_error("OpenCode", resp.status_code, resp.text)
+        if resp.status_code in (400, 404) and _says_model_unavailable(resp.text):
+            _unavailable[model] = time.monotonic()
+            error.model_unavailable = True
+        raise error
     try:
         data = resp.json()
     except Exception:
@@ -120,6 +141,49 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
         raise EmptyResponseError(messages.t("provider.empty_response", vendor="OpenCode",
                                             reason=f"finish_reason={finish}"))
     return text
+
+
+def free_chain() -> list[str]:
+    """免費模型的接力順序：AUTO_CHAIN 中目前仍上架的優先，其餘上架、適合摘要的免費模型接在後面
+    （例如 OpenCode 新上架的免費模型），讓預設模型下架時仍有模型可用。
+
+    最近回報「模型不可用」的移到最後，避免每一段都先撞同一個已下架的模型。
+    """
+    live, source = list_free_models()
+    if source == "live":
+        chain = [m for m in AUTO_CHAIN if m in live] + [
+            m for m in live if m not in AUTO_CHAIN and m not in _NOT_FOR_RELAY]
+    else:
+        chain = list(AUTO_CHAIN)
+    now = time.monotonic()
+    recent = {m for m, at in _unavailable.items() if now - at < _UNAVAILABLE_TTL}
+    return [m for m in chain if m not in recent] + [m for m in chain if m in recent]
+
+
+def generate_free(chat_messages: list[dict], system: str = "",
+                  on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
+    """只在 OpenCode 免費模型之間接力，絕不改用付費供應商。回傳 (文字, 實際使用的模型)。
+
+    單一模型下架或忙碌時換下一個；全部失敗才拋錯，訊息列出試過的模型與最後的原因。
+    """
+    tried: list[str] = []
+    last: Exception | None = None
+    for index, model in enumerate(free_chain()):
+        if index and on_status:
+            on_status({"state": "model_switch", "provider": "opencode", "model": model})
+        try:
+            return generate_messages(chat_messages, system=system, model=model, tries=2,
+                                     on_status=on_status)
+        except Exception as e:  # noqa: BLE001
+            tried.append(model)
+            last = e
+            print(f"[OpenCode] {model} 失敗，換下一個免費模型…：{e}", flush=True)
+    summary = messages.t("llm.free_chain_failed", models="、".join(tried) or "-")
+    error = ProviderError(f"{summary} {last}" if last else summary)
+    # 字幕翻譯等端點只顯示公開訊息：不含上游回應內容
+    public = getattr(last, "public_message", "")
+    error.public_message = f"{summary} {public}".strip()
+    raise error
 
 
 def generate(prompt: str, system: str = "", model: str = DEFAULT_FREE_MODEL,

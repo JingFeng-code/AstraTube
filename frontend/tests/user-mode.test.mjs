@@ -10,6 +10,9 @@ test('一般模式為預設、明確選擇後才會顯示開發者模式', () =>
 })
 
 test('一般模式不會沿用開發者付費 Provider 或深視覺設定', () => {
+  // free：後端只在免費模型之間接力，不綁定單一可能下架的模型
+  assert.equal(DEFAULT_FREE_PROVIDER, 'free')
+  assert.equal(effectiveProvider(false, ''), 'free')
   assert.equal(effectiveProvider(false, 'openai:paid-model'), DEFAULT_FREE_PROVIDER)
   assert.equal(effectiveDeepVisual(false, true), false)
   assert.equal(effectiveProvider(true, 'openai:paid-model'), 'openai:paid-model')

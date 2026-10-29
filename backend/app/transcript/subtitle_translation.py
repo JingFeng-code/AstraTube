@@ -53,7 +53,8 @@ def _validated_json(raw: str, expected_ids: set[int]) -> dict[int, str]:
 def resolve_provider(provider: str = "opencode") -> tuple[str, str, str]:
     """只允許預設免費模型或指定本地 Ollama；不接收付費 Provider。
 
-    cache_key 必須隔離兩個供應商；既有 OpenCode 快取維持原鍵向後相容。
+    cache_key 必須隔離兩個供應商；既有 OpenCode 快取維持原鍵向後相容
+    （免費模型接力時，實際模型可能不是預設模型，但都存在同一個免費模型快取）。
     """
     if provider == "opencode":
         model = opencode.DEFAULT_FREE_MODEL
@@ -96,7 +97,8 @@ def translate_batch(cues: list[dict], provider: str = "opencode") -> tuple[list[
             # 僅發至同環境的 loopback Ollama；沒有跨供應商的自動 fallback。
             response, _ = ollama.generate(prompt, _SYSTEM, model=model)
         else:
-            response, _ = opencode.generate(prompt, _SYSTEM, model=model, tries=2)
+            # 免費模型會無預警下架，只在免費模型之間接力（不會改用付費供應商）
+            response, _ = opencode.generate_free([{"role": "user", "content": prompt}], _SYSTEM)
         translated = _validated_json(response, {r["id"] for r in missing})
         for item in missing:
             translation_cache.put(item["text"], cache_key, translated[item["id"]])
