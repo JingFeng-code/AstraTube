@@ -9,7 +9,7 @@ import httpx
 
 from app.core import config, messages
 from app.llm.base import EmptyResponseError, ProviderError
-from app.llm.util import connect_error_message, http_error_message, with_retry
+from app.llm.util import connect_error, http_error, with_retry
 
 BASE_URL = "https://opencode.ai/zen/v1"
 DEFAULT_FREE_MODEL = "deepseek-v4-flash-free"
@@ -94,10 +94,10 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
             timeout=_CHAT_TIMEOUT,
         )
     except httpx.HTTPError as e:
-        raise ProviderError(connect_error_message("OpenCode", e))
+        raise connect_error("OpenCode", e)
 
     if resp.status_code >= 400:
-        raise ProviderError(http_error_message("OpenCode", resp.status_code, resp.text))
+        raise http_error("OpenCode", resp.status_code, resp.text)
     try:
         data = resp.json()
     except Exception:

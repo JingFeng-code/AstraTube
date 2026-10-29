@@ -78,6 +78,33 @@ def _status_hint(status: int) -> str:
     return ""
 
 
+def public_reason(error: Exception) -> str:
+    """可以安全顯示給瀏覽器的原因：只含狀態碼與我們自己寫的建議，不含服務端回應原文。
+
+    服務端錯誤內容可能回顯金鑰或送出去的字幕，這類內容只留在後端紀錄。
+    """
+    return getattr(error, "public_message", "") or ""
+
+
+def http_error(vendor: str, status: int, body: str) -> "ProviderError":
+    """建立 HTTP 錯誤：完整訊息（含回應摘要）供後端紀錄與重試判斷，公開訊息只含狀態碼與建議。"""
+    from app.llm.base import ProviderError
+    error = ProviderError(http_error_message(vendor, status, body))
+    error.status_code = status
+    error.public_message = f"{vendor} HTTP {status} {_status_hint(status)}".strip()
+    return error
+
+
+def connect_error(vendor: str, cause: Exception) -> "ProviderError":
+    """建立連線錯誤；公開訊息只說明是逾時還是連不上。"""
+    import httpx
+    from app.llm.base import ProviderError
+    error = ProviderError(connect_error_message(vendor, cause))
+    key = "provider.hint_timeout" if isinstance(cause, httpx.TimeoutException) else "provider.hint_network"
+    error.public_message = f"{messages.t('provider.connect_failed', vendor=vendor, error=type(cause).__name__)} {messages.t(key)}"
+    return error
+
+
 def http_error_message(vendor: str, status: int, body: str) -> str:
     """HTTP 錯誤：原始狀態碼與內容摘要＋下一步建議。狀態碼保留在字串中，供重試判斷使用。"""
     text = messages.t("provider.http_error", vendor=vendor, status=status,

@@ -34,3 +34,37 @@ export function nextUntranslatedIndex(cues, start=0) {
   const index = cues.findIndex((cue,i) => i >= from && !cue.translation)
   return index === -1 ? cues.length : index
 }
+
+
+// 播放器上的字幕顯示模式：無／原文／中文／雙語
+export const SUBTITLE_MODES = ['off', 'original', 'zh', 'bilingual']
+export const DEFAULT_SUBTITLE_MODE = 'bilingual'
+
+export function normalizeSubtitleMode(value) {
+  return SUBTITLE_MODES.includes(value) ? value : DEFAULT_SUBTITLE_MODE
+}
+
+// 依模式決定播放器上要顯示哪幾行。尚未翻譯的句子在「中文」模式先顯示原文並標示待翻譯，
+// 不讓畫面突然沒有字幕。
+export function overlayLines(cue, mode) {
+  if (!cue || mode === 'off') return []
+  const text = (cue.text || '').trim()
+  const translation = (cue.translation || '').trim()
+  if (mode === 'original') return text ? [{kind:'original', text}] : []
+  if (mode === 'zh') return translation ? [{kind:'translation', text:translation}] : (text ? [{kind:'pending', text}] : [])
+  return [
+    ...(translation ? [{kind:'translation', text:translation}] : []),
+    ...(text ? [{kind:'original', text}] : []),
+  ]
+}
+
+// 整片翻譯的下一批起點：優先從目前播放位置往後找，後面都翻好了才回頭補前面。
+// 全部翻完回傳 -1。
+export function nextBatchStart(cues, from = 0) {
+  if (!Array.isArray(cues) || !cues.length) return -1
+  const start = Number.isInteger(from) && from > 0 ? Math.min(from, cues.length - 1) : 0
+  const ahead = nextUntranslatedIndex(cues, start)
+  if (ahead < cues.length) return ahead
+  const behind = nextUntranslatedIndex(cues, 0)
+  return behind < cues.length ? behind : -1
+}

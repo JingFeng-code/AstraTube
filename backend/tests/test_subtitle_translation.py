@@ -114,6 +114,28 @@ def test_invalid_batch_and_error_do_not_forge_success():
             assert exc.status_code == 502
 
 
+def test_translation_error_shows_provider_reason_without_leaking_other_details():
+    from app.llm.util import http_error
+    echoed = http_error("OpenCode", 429, '{"error":"rate limited for key sk-SECRET123 on text 秘密字幕"}')
+    assert "sk-SECRET123" in str(echoed), "完整內容仍留給後端紀錄"
+    cases = [
+        (echoed, "HTTP 429", True),
+        (echoed, "上限", True),
+        (echoed, "sk-SECRET123", False),
+        (echoed, "秘密字幕", False),
+        (RuntimeError("internal transcript: 秘密逐字稿內容"), "秘密逐字稿", False),
+    ]
+    for error, needle, visible in cases:
+        with patch.object(subtitles, "get_subtitles", return_value={"cues": [{"text": "Hi"}]}), \
+             patch.object(subtitles.subtitle_translation, "translate_batch", side_effect=error):
+            try:
+                subtitles.translate_subtitles(subtitles.TranslateRequest(platform="youtube", video_id="M7lc1UVf-VE"))
+                assert False, "Expected HTTP error"
+            except HTTPException as exc:
+                assert exc.status_code == 502
+                assert (needle in exc.detail) is visible, exc.detail
+
+
 def test_bounded_batch():
     too_long = [{"id": 1, "text": "x" * 801}]
     try:
@@ -180,6 +202,7 @@ if __name__ == "__main__":
     test_cache_persists_and_separates_models()
     test_endpoint_binds_to_server_transcript_and_pages()
     test_invalid_batch_and_error_do_not_forge_success()
+    test_translation_error_shows_provider_reason_without_leaking_other_details()
     test_bounded_batch()
     test_ollama_translation_uses_own_model_and_cache()
     test_get_cached_translation_is_provider_specific()
