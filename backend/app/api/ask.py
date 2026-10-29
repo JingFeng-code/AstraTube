@@ -1,5 +1,6 @@
 """「問模型」端點：以影片逐字稿為背景知識的自由對話（Gemini 可搭 Google 搜尋）。"""
-from typing import Optional\nimport re
+from typing import Optional
+import re
 
 from fastapi import APIRouter, HTTPException
 
@@ -22,7 +23,17 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     """依序從 DeepSRT 快取 → whisper 快取 → 線上字幕撈逐字稿。"""
     if not video_id:
         return None
-    match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)\n    if match:\n        bvid, page = match.group(1), int(match.group(2))\n        cached = cache.get(bilibili.transcript_cache_key(bvid, page))\n        if cached:\n            return cached[0]\n        try:\n            return bilibili.fetch_transcript(bvid, page)[0]\n        except ValueError:\n            return None\n    for key in (f"deepsrt_v1:{video_id}", video_id):
+    match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)
+    if match:
+        bvid, page = match.group(1), int(match.group(2))
+        cached = cache.get(bilibili.transcript_cache_key(bvid, page))
+        if cached:
+            return cached[0]
+        try:
+            return bilibili.fetch_transcript(bvid, page)[0]
+        except ValueError:
+            return None
+    for key in (f"deepsrt_v1:{video_id}", video_id):
         hit = cache.get(key)
         if hit and hit[0].strip():
             return hit[0]
