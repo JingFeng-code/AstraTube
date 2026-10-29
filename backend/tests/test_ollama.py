@@ -44,6 +44,11 @@ class FakeClient:
 def test_only_loopback_hosts():
     for host in ("http://127.0.0.1:11434","http://localhost:11434/"):
         assert ollama.validate_base_url(host).startswith("http:")
+    try:
+        ollama.validate_model("gpt-oss:120b-cloud")
+        assert False, "cloud model should not be eligible for local-only mode"
+    except ValueError:
+        pass
     for bad in ("http://10.0.0.1:11434","http://127.0.0.1:8000",
                 "http://127.0.0.1:11434@evil.com:11434",
                 "https://localhost:11434",

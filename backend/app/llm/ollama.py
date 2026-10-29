@@ -40,6 +40,9 @@ def base_url() -> str:
 
 def validate_model(value: str) -> str:
     name = (value or "").strip()
+    # Ollama 也提供雲端模型；此 provider 僅供真正本地推論。
+    if name.lower().endswith("-cloud") or name.lower().endswith(":cloud"):
+        raise ValueError("這是 Ollama 雲端模型；請選擇下載到本機的模型。")
     if not _MODEL.fullmatch(name):
         raise ValueError("Ollama 模型名稱格式不正確。")
     return name
@@ -61,7 +64,9 @@ def list_models() -> list[str]:
     names = []
     for item in raw:
         name = item.get("name") if isinstance(item, dict) else None
-        if isinstance(name, str) and _MODEL.fullmatch(name) and name not in names:
+        if isinstance(name, str) and _MODEL.fullmatch(name) and (
+                not name.lower().endswith(("-cloud", ":cloud"))
+        ) and name not in names:
             names.append(name)
     return names
 
