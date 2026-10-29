@@ -108,7 +108,7 @@ function YouTubePlayer({ videoId, startAt, onTime }) {
   return <div className="player-host" ref={rootRef} aria-label="YouTube video player" />
 }
 
-export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1 }) {
+export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, developerMode=false, localModels=[] }) {
   const { t } = useI18n()
   const [cues, setCues] = useState([])
   const [subtitleError, setSubtitleError] = useState('')
@@ -120,6 +120,11 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   const [translateError, setTranslateError] = useState('')
   const [nextIndex, setNextIndex] = useState(0)
   const [showBilingual, setShowBilingual] = useState(true)
+  const [developerTranslation, setDeveloperTranslation] = useState('opencode')
+  // 回到一般模式就只使用免費模型；本地模型若不存在也退回預設，
+  // 切換模式時不刪掉開發者上次選擇。
+  const translationProvider = developerMode && developerTranslation.startsWith('ollama:')
+    && localModels.includes(developerTranslation.slice(7)) ? developerTranslation : 'opencode'
   const sourceGeneration = useRef(0)
 
   useEffect(() => {
@@ -134,7 +139,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     setNextIndex(0)
     setShowBilingual(true)
     setLoading(true)
-    getSubtitles(platform, videoId, page).then(result => {
+    getSubtitles(platform, videoId, page, translationProvider).then(result => {
       if (!cancelled) {
         const data = result.cues || []
         setCues(data)
@@ -144,7 +149,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
       if (!cancelled) setSubtitleError(err.message)
     }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [platform, videoId, page])
+  }, [platform, videoId, page, translationProvider])
 
   const [seek, setSeek] = useState(startAt)
   useEffect(() => { setSeek(startAt) }, [startAt.key])
@@ -157,7 +162,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     setTranslating(true)
     setTranslateError('')
     try {
-      const response = await translateSubtitles(platform, videoId, page, index, 16)
+      const response = await translateSubtitles(platform, videoId, page, index, 16, translationProvider)
       if (sourceGeneration.current !== generation) return
       const updated = applyTranslations(cues, response.translations)
       setCues(updated)
@@ -196,10 +201,19 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
           <strong>{t('subtitles.title')}</strong>
           <span>{t('subtitles.translationProgress', translatedCount, cues.length)}</span>
         </div>
+        {developerMode && <label className="subtitles-provider">
+          <span>{t('subtitles.engine')}</span>
+          <select value={translationProvider} onChange={e => setDeveloperTranslation(e.target.value)}
+                  aria-label={t('subtitles.engine')}>
+            <option value="opencode">{t('subtitles.freeEngine')}</option>
+            {localModels.map(model => <option key={model} value={`ollama:${model}`}>Ollama · {model}</option>)}
+          </select>
+          {!localModels.length && <small>{t('subtitles.noLocalModels')}</small>}
+        </label>}
         {!loading && !subtitleError && cues.length>0 && <div className="subtitles-controls">
           <button className="btn-paper" onClick={handleTranslate}
                   disabled={translating || nextIndex >= cues.length}>
-            {translating ? t('subtitles.translating') :
+            {translating ? t(translationProvider.startsWith('ollama:') ? 'subtitles.translatingLocal' : 'subtitles.translating') :
               nextIndex>=cues.length ? t('subtitles.translateDone') :
               t('subtitles.translateNext',Math.min(16,cues.length-nextIndex))}
           </button>

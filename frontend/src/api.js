@@ -51,10 +51,11 @@ export const readOutputFile = (path) => get('/implement/file?path=' + encodeURIC
 // 自由聊天室：以整支影片為背景知識問答。history 為目前為止的對話（不含本次 question）
 export const ask = (payload) => post('/ask', payload)
 // 僅回傳可公開取得的字幕時間軸；翻譯會在後續獨立功能提供。
-export async function getSubtitles(platform, videoId, page=1) {
+export async function getSubtitles(platform, videoId, page=1, translationProvider='opencode') {
   const path = '/subtitles?platform='+encodeURIComponent(platform)
     +'&video_id='+encodeURIComponent(videoId)
     +'&page='+encodeURIComponent(page)
+    +'&translation_provider='+encodeURIComponent(translationProvider)
   const res = await fetch(BASE+path)
   if (!res.ok) {
     const data = await res.json().catch(() => null)
@@ -62,8 +63,8 @@ export async function getSubtitles(platform, videoId, page=1) {
   }
   return res.json()
 }
-export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batchSize=16) =>
-  post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize})
+export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batchSize=16, translationProvider='opencode') =>
+  post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize, translation_provider:translationProvider})
 export const saveNote  = (payload) => post('/notes/save', payload)
 export async function notesStatus() {
   try { const r=await fetch(BASE+'/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
