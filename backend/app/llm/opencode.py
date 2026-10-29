@@ -84,13 +84,13 @@ def list_free_models() -> Tuple[list[str], str]:
     return list(models), source
 
 
-def _post_chat(model: str, messages: list[dict]) -> str:
+def _post_chat(model: str, chat_messages: list[dict]) -> str:
     """打一次 /chat/completions，回傳助手訊息內容。"""
     try:
         resp = httpx.post(
             f"{BASE_URL}/chat/completions",
             headers=_headers(),
-            json={"model": model, "messages": messages},
+            json={"model": model, "messages": chat_messages},
             timeout=_CHAT_TIMEOUT,
         )
     except httpx.HTTPError as e:
