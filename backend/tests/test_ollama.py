@@ -25,6 +25,31 @@ class FakeResponse:
         return self.data
 
 
+class FakeStream(FakeResponse):
+    """模擬 Ollama 串流回應：每行一個 JSON。"""
+    def __init__(self, lines, status_code=200, error=None):
+        super().__init__(None, status_code)
+        self.lines = lines
+        self.error = error
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
+    def iter_lines(self):
+        for line in self.lines:
+            if self.error:
+                raise self.error
+            yield line
+
+
+def _chat_lines(*pieces, thinking=""):
+    import json as _json
+    lines = [_json.dumps({"message": {"role": "assistant", "content": "", "thinking": thinking}, "done": False})] if thinking else []
+    lines += [_json.dumps({"message": {"role": "assistant", "content": p}, "done": False}) for p in pieces]
+    lines.append(_json.dumps({"message": {"role": "assistant", "content": ""}, "done": True}))
+    return lines
+
+
 class FakeClient:
     def __init__(self, reply):
         self.reply = reply
@@ -39,6 +64,9 @@ class FakeClient:
     def post(self, url, json):
         self.calls.append(("post",url,json))
         return FakeResponse(self.reply)
+    def stream(self, method, url, json):
+        self.calls.append((method.lower(),url,json))
+        return self.reply if isinstance(self.reply, FakeStream) else FakeStream(self.reply)
 
 
 def test_only_loopback_hosts():
@@ -73,13 +101,13 @@ def test_models_only_reflect_installed():
 def test_provider_routing_and_no_paid_fallback():
     assert llm_router.parse("ollama:qwen3:4b")==("ollama","qwen3:4b")
     assert llm_router.parallel_workers("ollama:qwen3:4b",10)==1
-    fake=FakeClient({"message":{"role":"assistant","content":"台灣繁體中文"}})
+    fake=FakeClient(_chat_lines("台灣", "繁體中文", thinking="先想一想"))
     with patch.object(ollama.httpx,"Client",return_value=fake):
         result=llm_router.generate("ollama:qwen3:4b","影片重點","用繁體中文回答")
-    assert result==("台灣繁體中文","Ollama/qwen3:4b")
+    assert result==("台灣繁體中文","Ollama/qwen3:4b"), "只組回 content，不含思考過程"
     method,url,payload=fake.calls[0]
     assert method=="post" and url.endswith("/api/chat")
-    assert payload["stream"] is False
+    assert payload["stream"] is True
     assert payload["model"]=="qwen3:4b"
     assert payload["messages"][0]["role"]=="system"
 
@@ -98,6 +126,37 @@ def test_configured_model_and_missing_model_error():
                 assert "沒有" in str(exc) or "尚無" in str(exc)
     finally:
         config._cache.update(original)
+
+
+def test_long_summary_gets_enough_context():
+    """摘要片段約 12000 字，預設 4096 tokens 的上下文會截掉前段；要依長度給足。"""
+    assert ollama.context_size([{"content": "短"}]) == 8192
+    assert ollama.context_size([{"content": "字" * 12000}, {"content": "規則" * 1000}]) == 24576
+    assert ollama.context_size([{"content": "字" * 100000}]) == 32768
+    fake=FakeClient(_chat_lines("ok"))
+    with patch.object(ollama.httpx,"Client",return_value=fake):
+        ollama.generate("字" * 12000, "系統", model="qwen3:14b")
+    assert fake.calls[0][2]["options"]["num_ctx"] == 16384
+
+
+def test_stream_errors_are_explained():
+    import json as _json
+    cases = [
+        (FakeStream([], status_code=404), "找不到模型"),
+        (FakeStream([_json.dumps({"error": "model requires more system memory"})]), "system memory"),
+        (FakeStream(["x"], error=httpx.ReadTimeout("slow")), "5 分鐘沒有任何輸出"),
+        (FakeStream(["not json"]), "格式不正確"),
+        (FakeStream(_chat_lines()), "沒有回傳文字"),
+        # 只收到部分內容、沒有 done 就結束：不可當成完整答案
+        (FakeStream(_chat_lines("前半段答案")[:-1]), "中斷"),
+    ]
+    for stream, expected in cases:
+        with patch.object(ollama.httpx,"Client",return_value=FakeClient(stream)):
+            try:
+                ollama.generate("hi", model="qwen3:14b")
+                raise AssertionError("Expected ProviderError")
+            except ProviderError as exc:
+                assert expected in str(exc), str(exc)
 
 
 def test_ask_uses_ollama_not_opencode():
@@ -149,6 +208,8 @@ if __name__=="__main__":
     test_models_only_reflect_installed()
     test_provider_routing_and_no_paid_fallback()
     test_configured_model_and_missing_model_error()
+    test_long_summary_gets_enough_context()
+    test_stream_errors_are_explained()
     test_ask_uses_ollama_not_opencode()
     test_failure_status_graceful()
     test_status_for_unsaved_url_keeps_loopback_rule()
