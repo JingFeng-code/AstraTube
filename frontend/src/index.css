@@ -439,3 +439,12 @@ button:disabled{cursor:not-allowed}
 /* 開發者模式：測試本地 Ollama 連線，不在一般模式暴露技術欄位。 */
 .settings-ollama-check{display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px}
 .settings-ollama-check p{margin:0;flex:1;min-width:180px}
+
+/* 一般模式也能匯入合法持有的字幕；不必啟用開發者功能。 */
+.subtitle-import-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 20px 12px}
+.subtitle-import-bar button{min-height:32px;font-size:12px;cursor:pointer}
+.subtitle-import-bar button:disabled{opacity:.5;cursor:default}
+.subtitle-import-bar .import-status{font-size:12px;color:var(--text-soft);line-height:1.5}
+.subtitle-import-bar .import-hint{font-size:12px;color:var(--text-faint);flex-basis:100%;line-height:1.5}
+.subtitle-import-bar .import-error{color:var(--danger,#d55);font-size:12px;flex-basis:100%}
+@media(max-width:600px){.subtitle-import-bar{padding:8px 12px 12px}}

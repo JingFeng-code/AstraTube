@@ -63,6 +63,10 @@ export async function getSubtitles(platform, videoId, page=1, translationProvide
   }
   return res.json()
 }
+// 匯入的是使用者有權持有的字幕文字，不下載影片。
+export const importSubtitleFile = (videoUrl, filename, content) => post('/subtitles/imported', {video_url:videoUrl, filename, content})
+export const removeImportedSubtitles = videoUrl => post('/subtitles/imported/remove', {video_url:videoUrl})
+export const importedSubtitleStatus = videoUrl => post('/subtitles/imported/status', {video_url:videoUrl})
 export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batchSize=16, translationProvider='opencode') =>
   post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize, translation_provider:translationProvider})
 export const saveNote  = (payload) => post('/notes/save', payload)

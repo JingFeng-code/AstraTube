@@ -11,7 +11,7 @@ from app.llm import router as llm_router
 from app.llm.base import NotConfiguredError, RefusalError
 from app.models.schemas import AskRequest
 from app.prompts.ask import ask_system
-from app.transcript import cache, captions, bilibili
+from app.transcript import cache, captions, bilibili, imported_subtitles
 
 router = APIRouter(tags=["ask"])
 
@@ -26,6 +26,9 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)
     if match:
         bvid, page = match.group(1), int(match.group(2))
+        uploaded = imported_subtitles.load("bilibili", bvid, page)
+        if uploaded:
+            return imported_subtitles.transcript_from_cues(uploaded["cues"])
         cached = cache.get(bilibili.transcript_cache_key(bvid, page))
         if cached:
             return cached[0]
@@ -33,6 +36,10 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
             return bilibili.fetch_transcript(bvid, page)[0]
         except ValueError:
             return None
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        uploaded = imported_subtitles.load("youtube", video_id)
+        if uploaded:
+            return imported_subtitles.transcript_from_cues(uploaded["cues"])
     for key in (f"deepsrt_v1:{video_id}", video_id):
         hit = cache.get(key)
         if hit and hit[0].strip():
