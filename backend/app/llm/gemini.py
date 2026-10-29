@@ -142,17 +142,17 @@ def generate(prompt: str, system: str = "", seg: int = 0,
                       on_status=on_status), use
 
 
-def generate_chat(messages: list[dict], system: str = "", seg: int = 0,
+def generate_chat(chat_messages: list[dict], system: str = "", seg: int = 0,
                   search: bool = True) -> Tuple[str, str]:
     """多輪對話生成，預設掛 Google 搜尋工具（grounding），供「問模型」使用。
 
-    messages 為 [{"role": "user"|"assistant", "content": str}, ...]。
+    chat_messages 為 [{"role": "user"|"assistant", "content": str}, ...]。
     搜尋工具不可用時自動退回純對話。回傳 (文字, 模型標籤)。
     """
     contents = [
         types.Content(role=("user" if m["role"] == "user" else "model"),
                       parts=[types.Part(text=m["content"])])
-        for m in messages
+        for m in chat_messages
     ]
 
     def make_config(use_search: bool):

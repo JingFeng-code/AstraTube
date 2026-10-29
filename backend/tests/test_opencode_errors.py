@@ -1,4 +1,4 @@
-"""OpenCode API error handling keeps the real HTTP/network cause visible (no live calls)."""
+"""OpenCode API 錯誤處理：保留真正的 HTTP／網路原因，不再被變數遮蔽成 AttributeError（不呼叫真實 API）。"""
 import sys
 from pathlib import Path
 from unittest.mock import patch

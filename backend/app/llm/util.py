@@ -1,6 +1,9 @@
 """LLM 呼叫的重試／退避工具。"""
+import re
 import time
 from typing import Any, Callable, TypeVar
+
+from app.core import messages
 
 T = TypeVar("T")
 
@@ -48,3 +51,45 @@ def with_retry(fn: Callable[[], T], *, tries: int = 3, base: float = 0.8,
                            "tries": tries, "delay": sleep})
             time.sleep(sleep)
     raise last  # type: ignore[misc]
+
+
+# ── 給使用者看的錯誤說明 ─────────────────────────────────────
+# 供應商錯誤要讓人看得出「是誰的問題、下一步做什麼」，不能只丟一個狀態碼。
+
+_TAG = re.compile(r"<[^>]{0,200}>")
+
+
+def _clean_detail(body: str, limit: int = 160) -> str:
+    """把回應內容整理成短句：去掉 HTML 標籤（例如 Cloudflare 擋頁）與多餘空白。"""
+    text = _TAG.sub(" ", body or "")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:limit]
+
+
+def _status_hint(status: int) -> str:
+    if status in (401, 403):
+        return messages.t("provider.hint_auth")
+    if status == 404:
+        return messages.t("provider.hint_not_found")
+    if status == 429:
+        return messages.t("provider.hint_rate_limit")
+    if status >= 500:
+        return messages.t("provider.hint_server")
+    return ""
+
+
+def http_error_message(vendor: str, status: int, body: str) -> str:
+    """HTTP 錯誤：原始狀態碼與內容摘要＋下一步建議。狀態碼保留在字串中，供重試判斷使用。"""
+    text = messages.t("provider.http_error", vendor=vendor, status=status,
+                      detail=_clean_detail(body) or "-")
+    hint = _status_hint(status)
+    return f"{text} {hint}".strip()
+
+
+def connect_error_message(vendor: str, error: Exception) -> str:
+    """連線層錯誤：區分逾時與連不上。逾時字樣保留給重試判斷。"""
+    import httpx
+    key = "provider.hint_timeout" if isinstance(error, httpx.TimeoutException) else "provider.hint_network"
+    text = messages.t("provider.connect_failed", vendor=vendor,
+                      error=_clean_detail(str(error)) or type(error).__name__)
+    return f"{text} {messages.t(key)}"

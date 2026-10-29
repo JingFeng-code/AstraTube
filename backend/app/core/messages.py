@@ -77,6 +77,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "摘要失敗：所有片段都無法產生，請稍後再試或換模型。",
         "en": "Extraction failed: no part produced cards. Try again or switch models.",
     },
+    "summarize.model_output_invalid": {
+        "zh-Hant": "模型回應不是有效的知識卡格式（可能只輸出了思考過程、內容被截斷，或模型不支援 JSON 輸出）。請重試，或在開發者模式更換模型。",
+        "en": "The model did not return valid card data (it may have returned only its reasoning, been cut off, or not support JSON output). Try again, or switch models in developer mode.",
+    },
     "summarize.deepdive_failed": {
         "zh-Hant": "深入解析失敗：{error}",
         "en": "Deep dive failed: {error}",
@@ -236,13 +240,33 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Run failed: {error}",
     },
 
+    # ── YouTube 字幕 ────────────────────────────────────────
+    "captions.missing": {
+        "zh-Hant": "這支 YouTube 影片沒有提供公開字幕（作者未上傳或已停用）。",
+        "en": "This YouTube video has no public captions (none uploaded or captions are disabled).",
+    },
+    "captions.unavailable": {
+        "zh-Hant": "YouTube 表示這支影片無法播放或受到限制（私人、已移除、年齡或地區限制），因此讀不到字幕。",
+        "en": "YouTube reports this video is unavailable or restricted (private, removed, age- or region-limited), so captions cannot be read.",
+    },
+    "captions.blocked": {
+        "zh-Hant": "YouTube 暫時拒絕了字幕請求（常見於短時間請求過多或目前網路被限制）。影片本身可能有字幕，請稍後再試或換一個網路。",
+        "en": "YouTube temporarily refused the caption request (often too many requests or a restricted network). The video may still have captions; try again later or from another network.",
+    },
+    "captions.network": {
+        "zh-Hant": "無法連線到 YouTube 取得字幕（網路、Proxy 或防火牆問題）。影片本身可能有字幕，請確認網路後重試。",
+        "en": "Could not reach YouTube to fetch captions (network, proxy or firewall). The video may still have captions; check your connection and retry.",
+    },
+    "captions.service": {
+        "zh-Hant": "YouTube 字幕服務回應異常（可能是平台介面變更），目前無法判斷影片是否有字幕。請稍後再試；若持續發生，請回報給開發者。",
+        "en": "YouTube's caption service returned an unexpected response (possibly a platform change), so it is unclear whether captions exist. Try again later and report it if it keeps happening.",
+    },
     # ── 本機轉寫 ────────────────────────────────────────────
     "whisper.unavailable_desktop": {
-        "zh-Hant": "這支影片沒有可讀取的公開字幕，而桌面測試版尚未內建本機語音轉錄。"
-                   "請改用你有權使用的 SRT／VTT 字幕檔匯入後再分析。",
-        "en": "This video has no readable public captions, and the desktop preview does not "
-              "include local speech-to-text yet. Import an SRT/VTT file you are allowed to use, "
-              "then analyze again.",
+        "zh-Hant": "桌面測試版尚未內建本機語音轉錄，無法改用語音辨識。"
+                   "可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "The desktop preview does not include local speech-to-text yet, so it cannot "
+              "transcribe the audio. Import an SRT/VTT file you are allowed to use, then press Start.",
     },
     "whisper.download_failed": {
         "zh-Hant": "無法下載此影片的音訊（可能不支援、需登入或已下架）：{detail}",
@@ -274,6 +298,30 @@ MESSAGES: dict[str, dict[str, str]] = {
     "provider.http_error": {
         "zh-Hant": "{vendor} HTTP {status}：{detail}",
         "en": "{vendor} HTTP {status}: {detail}",
+    },
+    "provider.hint_auth": {
+        "zh-Hant": "服務拒絕存取：可能需要 API Key、金鑰無效，或目前網路／地區被限制。可在開發者模式改用其他模型或本機 Ollama。",
+        "en": "Access was refused: an API key may be required or invalid, or this network/region is blocked. In developer mode, try another model or local Ollama.",
+    },
+    "provider.hint_not_found": {
+        "zh-Hant": "模型可能已下架或名稱有誤，請在開發者模式更換模型。",
+        "en": "The model may have been retired or renamed. Pick another model in developer mode.",
+    },
+    "provider.hint_rate_limit": {
+        "zh-Hant": "免費額度或請求次數已達上限，請稍等幾分鐘再試，或更換模型。",
+        "en": "The free quota or rate limit was reached. Wait a few minutes or switch models.",
+    },
+    "provider.hint_server": {
+        "zh-Hant": "模型服務暫時故障，請稍後再試。",
+        "en": "The model service is having trouble. Please try again later.",
+    },
+    "provider.hint_timeout": {
+        "zh-Hant": "模型回應逾時，請稍後再試，或改用回應較快的模型。",
+        "en": "The model timed out. Try again later or use a faster model.",
+    },
+    "provider.hint_network": {
+        "zh-Hant": "請確認網路連線，以及 Proxy／防火牆是否允許連到模型服務。",
+        "en": "Check your internet connection and whether a proxy or firewall blocks the model service.",
     },
     "provider.not_json": {
         "zh-Hant": "{vendor} 回應非 JSON：{detail}",

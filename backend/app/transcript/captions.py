@@ -3,10 +3,52 @@ import re
 import time
 from typing import Optional, Tuple
 
+import requests
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled
+from youtube_transcript_api._errors import (AgeRestricted, InvalidVideoId,
+                                            NoTranscriptFound, PoTokenRequired, RequestBlocked,
+                                            TranscriptsDisabled, VideoUnavailable, VideoUnplayable,
+                                            YouTubeRequestFailed)
 
+from app.core import messages
 from app.transcript import cache
+
+
+class CaptionError(ValueError):
+    """字幕取得失敗，附帶可分類的原因。
+
+    kind：
+      missing      影片確實沒有（或停用了）字幕
+      unavailable  影片私人、已移除、年齡或地區限制
+      blocked      YouTube 拒絕請求（請求過多、IP 被暫時封鎖、需要驗證）
+      network      連不到 YouTube（網路、Proxy、防火牆）
+      service      YouTube 回應異常或格式變更（可能需要更新套件）
+    只有 missing 代表「這支影片沒有字幕」；其他狀況影片本身可能有字幕。
+    """
+
+    def __init__(self, kind: str, detail: str = ""):
+        self.kind = kind
+        self.detail = detail
+        super().__init__(messages.t(f"captions.{kind}"))
+
+
+def classify_error(error: Exception) -> CaptionError:
+    """把 youtube-transcript-api／requests 的例外對應到使用者看得懂的原因。"""
+    if isinstance(error, CaptionError):
+        return error
+    detail = f"{type(error).__name__}: {' '.join(str(error).split())[:300]}"
+    if isinstance(error, (NoTranscriptFound, TranscriptsDisabled, StopIteration)):
+        return CaptionError("missing", detail)
+    if isinstance(error, (VideoUnavailable, VideoUnplayable, AgeRestricted, InvalidVideoId)):
+        return CaptionError("unavailable", detail)
+    if isinstance(error, (RequestBlocked, PoTokenRequired)):  # IpBlocked 是 RequestBlocked 的子類別
+        return CaptionError("blocked", detail)
+    if isinstance(error, YouTubeRequestFailed) and "429" in str(error):
+        return CaptionError("blocked", detail)
+    if isinstance(error, requests.RequestException):
+        return CaptionError("network", detail)
+    # 其他 CouldNotRetrieveTranscript（無法解析、建立同意 Cookie 失敗）與未預期的例外
+    return CaptionError("service", detail)
 
 CACHE_PREFIX = "captions_v1:"
 
@@ -32,7 +74,7 @@ def _format(entries) -> str:
 
 
 def fetch_transcript(video_id: str, use_cache: bool = True) -> Tuple[str, bool]:
-    """抓字幕，回傳 (逐字稿, is_chinese)。取不到會拋 ValueError。
+    """抓字幕，回傳 (逐字稿, is_chinese)。取不到會拋 CaptionError（ValueError 子類別，附原因分類）。
 
     字幕是不會變的靜態資料，實測抓一次要 30 秒以上，因此跨重啟快取。
     """
@@ -49,15 +91,20 @@ def fetch_transcript(video_id: str, use_cache: bool = True) -> Tuple[str, bool]:
         result = None
         for lang in _PREFERRED_LANGS:
             try:
-                entries = tl.find_transcript([lang]).fetch()
-                result = (_format(entries), lang.startswith("zh"))
-                break
-            except Exception:
+                transcript = tl.find_transcript([lang])
+            except NoTranscriptFound:
                 continue
+            # 找到了卻下載失敗（被擋、網路斷線）要往外拋，不能當成「沒有這個語言」
+            result = (_format(transcript.fetch()), lang.startswith("zh"))
+            break
         if result is None:
             result = (_format(next(iter(tl)).fetch()), False)
-    except (TranscriptsDisabled, NoTranscriptFound) as e:
-        raise ValueError(f"無法取得字幕：{e}")
+        if not result[0].strip():
+            raise CaptionError("missing", "transcript has no text")
+    except Exception as e:  # noqa: BLE001  一律分類，避免把被擋／斷線誤報成沒有字幕
+        error = classify_error(e)
+        print(f"[captions] 字幕取得失敗（{error.kind}）：{error.detail}", flush=True)
+        raise error from e
 
     print(f"[captions] 取得字幕耗時 {time.time() - t0:.1f}s（{len(result[0])} 字元）", flush=True)
     if use_cache and result[0]:
