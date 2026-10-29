@@ -32,6 +32,15 @@ bash scripts/start.sh
 - Codespaces 不會自動存取你 Windows / WSL 上的 Ollama、RTX 4060 Ti 或私人 Obsidian Vault；須另外安排本地模式。
 - 只有獲授權的影片/字幕來源才用來進行下載、轉錄與保存。
 
+### 本機 API 來源防護
+
+後端只接受「AstraTube 自己的介面」發出的請求，避免你瀏覽的其他網站偷偷讀取設定、改掉 Obsidian 路徑或消耗你的 API 額度：
+
+- `Host` 必須是 `127.0.0.1`、`localhost` 或 `::1`（防 DNS rebinding）。Vite 代理會自動改成 `127.0.0.1:8420`，一般不需設定。
+- 瀏覽器帶來的 `Origin` 只接受本機網址（任何埠）、桌面版 Tauri 視窗，以及**目前這個** Codespace 的轉送網址（依 `CODESPACE_NAME` 判斷）。
+- 確實需要額外來源時，才用環境變數加入，以逗號分隔：`ASTRA_ALLOWED_ORIGINS=https://example.internal`、`ASTRA_ALLOWED_HOSTS=my-pc.local`。這不是登入系統，**不要**因此把後端公開到網際網路。
+- 若 Codespaces 畫面出現「Request origin is not allowed」，請確認後端是在該 Codespace 的終端機以 `bash scripts/start.sh` 啟動。
+
 ## 測試與除錯
 
 ```bash

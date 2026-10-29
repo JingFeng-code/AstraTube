@@ -4,11 +4,11 @@
 
 ## 目前的架構
 
-- Tauri 負責 Windows 桌面視窗及後端 Sidecar 啟停，關閉程式後會停止由它啟動的 FastAPI 行程。
+- Tauri 負責 Windows 桌面視窗及後端 Sidecar 啟停，關閉程式後會停止由它啟動的 FastAPI 行程；Sidecar 也會每 2 秒確認桌面程式仍在，桌面程式當掉或被強制結束時自行退出（CI 以打包後的 exe 自動驗證，Windows 實機仍待驗收）。
 - React 依然使用現有的字幕、影片摘要、知識卡、Obsidian、Ollama 及 AI 問答畫面。
 - FastAPI 以 PyInstaller 包裝成獨立 `astratube-backend.exe`，**安裝後一般使用者不需要自己安裝 Python/Node.js**。
 - 每次啟動由 Rust 選擇回環位址上的隨機埠，產生新的高熵會話 Token；桌面 React 啟動時經 Tauri invoke 取得本次 Token，所有 API 請求都要帶 `X-Astra-Desktop-Token`。
-- FastAPI 只監聽 `127.0.0.1`，不會監聽 `0.0.0.0`。遠端網頁不能因為得知埠號就無認證呼叫本機 API。
+- FastAPI 只監聽 `127.0.0.1`，不會監聽 `0.0.0.0`。遠端網頁不能因為得知埠號就無認證呼叫本機 API；後端另外檢查 Host 與 Origin，其他網站即使猜到 Token 也會被拒絕。
 - 桌面模式的 `settings.json` 與 `.cache/` 會存在**目前 Windows 使用者的應用程式資料目錄**（由 Tauri `app_data_dir` 指定），不寫進安裝資料夾或 Git。
 - Tauri 不提供任意 shell 命令權限給網頁介面。Coding Agent 自動執行仍預設關閉。
 - 主視窗不載入任何第三方腳本（CSP `script-src 'self'`）。YouTube 官方播放器 API 改在獨立來源 `http://astraplayer.localhost` 的 iframe 內執行，拿不到 Tauri IPC 與後端 Token；詳見 [桌面版 YouTube 播放器隔離說明](DESKTOP_PLAYER_ISOLATION.zh-TW.md)。

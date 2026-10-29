@@ -9,6 +9,7 @@
 """
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -115,6 +116,26 @@ def all_settings() -> dict[str, str]:
     return dict(_cache)
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """先寫暫存檔再整檔替換。
+
+    直接覆寫時若程式當掉或斷電，settings.json 會只剩一半；下次讀取失敗就會被當成空設定，
+    使用者看起來像是所有金鑰都消失了。替換是原子操作，檔案只會是舊版或新版。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                     prefix=".settings-", suffix=".tmp", delete=False) as tmp:
+        tmp.write(text)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        temp_path = Path(tmp.name)
+    try:
+        os.chmod(temp_path, 0o600)  # 內含 API 金鑰；Windows 上僅影響唯讀屬性
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 def save(updates: dict) -> dict[str, str]:
     """更新並持久化設定。只更新有提供（非 None）的欄位；空字串代表清除。
 
@@ -135,8 +156,7 @@ def save(updates: dict) -> dict[str, str]:
     merged = _read_settings_file()
     merged.update(_cache)
     try:
-        _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _SETTINGS_PATH.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+        _write_atomic(_SETTINGS_PATH, json.dumps(merged, ensure_ascii=False, indent=2))
     except Exception as e:
         # 只帶原始錯誤；給使用者看的句子由 API 層依介面語言組裝。
         # config 不得反向匯入 messages（messages 要靠 config 讀 UI_LANGUAGE），否則循環匯入。

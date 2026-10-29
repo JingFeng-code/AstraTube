@@ -61,10 +61,18 @@ def _try_captions(video_id: str) -> Optional[Content]:
     return _pack("youtube", video_id, hit[0], hit[1], "captions") if hit else None
 
 
-def _youtube(url: str, video_id: str, deep_visual: bool) -> Content:
-    """YouTube 三層轉錄瀑布。預設字幕優先（省 Gemini 額度）；深視覺模式 DeepSRT 優先。"""
-    order = (lambda: _try_deepsrt(url, video_id), lambda: _try_captions(video_id)) if deep_visual \
-        else (lambda: _try_captions(video_id), lambda: _try_deepsrt(url, video_id))
+def _youtube(url: str, video_id: str, deep_visual: bool, allow_cloud_fallback: bool = True) -> Content:
+    """YouTube 三層轉錄瀑布。預設字幕優先（省 Gemini 額度）；深視覺模式 DeepSRT 優先。
+
+    allow_cloud_fallback=False 時（使用者明確選了 Ollama／OpenCode 等非 Gemini 模型），
+    字幕失敗不得改把影片交給 Gemini 雲端轉錄，直接落到本機 Whisper。
+    """
+    if deep_visual:
+        order = (lambda: _try_deepsrt(url, video_id), lambda: _try_captions(video_id))
+    elif allow_cloud_fallback:
+        order = (lambda: _try_captions(video_id), lambda: _try_deepsrt(url, video_id))
+    else:
+        order = (lambda: _try_captions(video_id),)
     for layer in order:
         result = layer()
         if result is not None:
@@ -80,8 +88,12 @@ def _pack(kind: str, video_id: Optional[str], text: str, is_chinese: bool,
                    is_chinese=is_chinese, has_timestamps=True, transcript_source=source)
 
 
-def route_content(url: str, deep_visual: bool = False) -> Content:
-    """依網址型態取得內容。取不到會拋出例外（ValueError 代表使用者輸入問題）。"""
+def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: bool = True) -> Content:
+    """依網址型態取得內容。取不到會拋出例外（ValueError 代表使用者輸入問題）。
+
+    allow_cloud_fallback 只影響「字幕失敗後是否自動改用 Gemini DeepSRT」；
+    使用者主動開啟深視覺時仍照常使用 Gemini。
+    """
     bili = bilibili.parse_video_url(url)
     if bili:
         if deep_visual:
@@ -109,7 +121,7 @@ def route_content(url: str, deep_visual: bool = False) -> Content:
             return _pack("youtube", video_id,
                          imported_subtitles.transcript_from_cues(uploaded["cues"]),
                          uploaded["is_chinese"], "imported_subtitles")
-        return _youtube(url, video_id, deep_visual)
+        return _youtube(url, video_id, deep_visual, allow_cloud_fallback)
 
     try:
         title, text = fetch_article(url)
