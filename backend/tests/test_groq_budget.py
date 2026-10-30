@@ -49,6 +49,7 @@ def test_groq_completion_cap_and_pacer_only_for_groq():
         ) == "ok"
         data = post.call_args.kwargs["json"]
         assert data["max_completion_tokens"] == 1400
+        assert data["reasoning_effort"] == "none"
         assert data["model"] == "qwen/qwen3.8-27b"
         assert before.call_count == 1 and observe.call_count == 1
         assert before.call_args.args[1] >= 1400
