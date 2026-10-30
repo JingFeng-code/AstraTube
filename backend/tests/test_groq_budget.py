@@ -29,7 +29,7 @@ def test_only_groq_uses_lower_budget():
 
 def test_budget_prompt_is_shorter_and_still_has_card_schema():
     content = {"type": "youtube", "has_timestamps": True,
-               "text": "[0] Hello world.\\n[15] Here is a specific setup step."}
+               "text": "[0] Hello world.\n[15] Here is a specific setup step."}
     compressed = budget_summarize_prompt(content)
     original = summarize_prompt(content)
     assert len(compressed) < len(original) * .6
@@ -40,9 +40,9 @@ def test_budget_prompt_is_shorter_and_still_has_card_schema():
 
 def test_groq_completion_cap_and_pacer_only_for_groq():
     fake = httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-    with patch.object(openai_compat.httpx, "post", return_value=fake) as post, \\
-         patch.object(openai_compat.groq_pacer, "before") as before, \\
-         patch.object(openai_compat.groq_pacer, "observe") as observe, \\
+    with patch.object(openai_compat.httpx, "post", return_value=fake) as post, \
+         patch.object(openai_compat.groq_pacer, "before") as before, \
+         patch.object(openai_compat.groq_pacer, "observe") as observe, \
          patch.object(openai_compat, "_headers", return_value={"Authorization": "Bearer test"}):
         assert openai_compat._post_chat(
             openai_compat.GROQ, "qwen/qwen3.8-27b", [{"role": "user", "content": "hello"}]
@@ -64,9 +64,9 @@ def test_request_too_large_is_permanent_and_has_safe_error():
     response = httpx.Response(429, json={
         "error": {"message": "Request too large for model in organization org_private"}
     })
-    with patch.object(openai_compat.httpx, "post", return_value=response), \\
-         patch.object(openai_compat.groq_pacer, "before"), \\
-         patch.object(openai_compat.groq_pacer, "observe"), \\
+    with patch.object(openai_compat.httpx, "post", return_value=response), \
+         patch.object(openai_compat.groq_pacer, "before"), \
+         patch.object(openai_compat.groq_pacer, "observe"), \
          patch.object(openai_compat, "_headers", return_value={"Authorization": "Bearer test"}):
         try:
             openai_compat._post_chat(
@@ -105,7 +105,7 @@ async def _events(response):
 
 
 def test_stream_splits_groq_and_uses_single_worker_without_affecting_others():
-    transcript = "\\n".join(f"[{i*15}] 這是第{i}句字幕，包含實際可操作的步驟及知識內容。" for i in range(190))
+    transcript = "\n".join(f"[{i*15}] 這是第{i}句字幕，包含實際可操作的步驟及知識內容。" for i in range(190))
     source = {"type": "youtube", "video_id": "dQw4w9WgXcQ", "text": transcript,
               "has_timestamps": True, "transcript_source": "captions"}
     captures = []
@@ -113,7 +113,7 @@ def test_stream_splits_groq_and_uses_single_worker_without_affecting_others():
         captures.append(chunk)
         return ({"title": "test", "cards": [{"heading": f"片段{index}", "summary": "ok"}]},
                 "Groq/qwen/qwen3.8-27b")
-    with patch.object(summary_api, "route_content", return_value=source), \\
+    with patch.object(summary_api, "route_content", return_value=source), \
          patch.object(summary_api, "_run_segment", side_effect=fake_run):
         resp = summary_api.summarize_stream(SummarizeRequest(
             url="https://youtube.com/watch?v=dQw4w9WgXcQ", provider="groq:qwen/qwen3.8-27b"))
