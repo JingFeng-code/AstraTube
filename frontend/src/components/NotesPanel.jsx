@@ -1,7 +1,7 @@
 import { fmtTime } from '../utils.js'
 import { useI18n } from '../i18n/index.jsx'
 
-export default function NotesPanel({ vault, clips, onClipNoteChange, onRemoveClip, freeNote, setFreeNote, filename, setFilename, onSave, onExport, developerMode=false, saving, folders, noteFiles, saveOpts, onSaveOptsChange }) {
+export default function NotesPanel({ vault, clips, onClipNoteChange, onRemoveClip, freeNote, setFreeNote, filename, setFilename, onSave, onExport, saving, folders, noteFiles, saveOpts, onSaveOptsChange }) {
   const { t } = useI18n()
   const vs=!vault.configured?{cls:'warn',text:t('vault.notConfigured')}:!vault.exists?{cls:'warn',text:t('vault.missing')}:{cls:'ok',text:t('vault.connected')}
   const isAppend=saveOpts.mode==='append'
@@ -21,8 +21,9 @@ export default function NotesPanel({ vault, clips, onClipNoteChange, onRemoveCli
       </div>
       <textarea className="free-note" placeholder={t('notes.free')} value={freeNote} onChange={e=>setFreeNote(e.target.value)}/>
 
-      {!developerMode&&<input className="fname" type="text" placeholder={t('notes.filename')} value={filename} onChange={e=>setFilename(e.target.value)}/>}
-      {developerMode&&vault.configured&&(
+
+      {!vault.configured&&<input className="fname" type="text" placeholder={t('notes.filename')} value={filename} onChange={e=>setFilename(e.target.value)}/>}
+      {vault.configured&&(
         <div className="save-config">
           <label className="cfg-row">
             <span className="cfg-label">{t('notes.folder')}</span>
@@ -50,9 +51,9 @@ export default function NotesPanel({ vault, clips, onClipNoteChange, onRemoveCli
         </div>
       )}
 
-      {developerMode&&<button className="btn-save" onClick={onSave} disabled={!canSave}>{saving?t('notes.saving'):isAppend?t('notes.append'):t('notes.save')}</button>}
+      {vault.configured&&<button className="btn-save" onClick={onSave} disabled={!canSave}>{saving?t('notes.saving'):isAppend?t('notes.append'):t('notes.save')}</button>}
       <button className="btn-save" onClick={onExport} disabled={!(clips.length>0||freeNote.trim())}>{t('notes.downloadMarkdown')}</button>
-      {developerMode&&<p className="save-hint"><span className={`vault-chip ${vs.cls}`} style={{marginLeft:0}}><span className="dot"/> {vs.text}</span><br/>{vault.configured?`vault：${vault.path?.replace(/[/\\][^/\\]*$/,'')||vault.path}`:t('notes.vaultHint')}</p>}
+      {vault.configured&&<p className="save-hint"><span className={`vault-chip ${vs.cls}`} style={{marginLeft:0}}><span className="dot"/> {vs.text}</span><br/>{vault.configured?`vault：${vault.path?.replace(/[/\\][^/\\]*$/,'')||vault.path}`:t('notes.vaultHint')}</p>}
     </aside>
   )
 }

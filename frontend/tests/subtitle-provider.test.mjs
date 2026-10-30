@@ -1,14 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { effectiveSubtitleTranslationProvider as provider } from '../src/utils/subtitle-provider.js'
-
-test('general mode always uses default free subtitle translation', () => {
-  assert.equal(provider(false,'ollama:qwen3:4b',['qwen3:4b']), 'opencode')
-  assert.equal(provider(false,'openai:gpt',['qwen3:4b']), 'opencode')
+import { effectiveSubtitleTranslationProvider as effective } from '../src/utils/subtitle-provider.js'
+test('字幕與摘要、問答共用選定的 Provider',()=>{
+  for(const choice of ['ollama:qwen3:4b','gemini','openai:gpt-4.1','opencode:some-free'])assert.equal(effective(choice),choice)
 })
-test('developer mode uses only installed Ollama models', () => {
-  assert.equal(provider(true,'ollama:qwen3:4b',['qwen3:4b']), 'ollama:qwen3:4b')
-  assert.equal(provider(true,'ollama:qwen3:8b',['qwen3:4b']), 'opencode')
-  assert.equal(provider(true,'openai:gpt-4.1',['qwen3:4b']), 'opencode')
-  assert.equal(provider(true,'opencode',['qwen3:4b']), 'opencode')
+test('未準備 AI 仍可讀字幕舊快取，但不會啟動翻譯',()=>{
+  assert.equal(effective(null),'opencode') // VideoPane 用 !provider 禁止生成
 })

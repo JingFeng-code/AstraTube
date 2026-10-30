@@ -151,7 +151,7 @@ def test_ollama_translation_uses_own_model_and_cache():
     label = "ollama:qwen3:4b"
     assert subtitle_translation.resolve_provider(label) == ("ollama", "qwen3:4b", label)
     assert subtitle_translation.resolve_provider("opencode")[2] == opencode.DEFAULT_FREE_MODEL
-    for invalid in ("", "openai:gpt-4.1", "gemini", "ollama:", "ollama:qwen3:4b-cloud"):
+    for invalid in ("", "auto", "free", "ollama:", "ollama:qwen3:4b-cloud", "openai:", "invalid:model"):
         try:
             subtitle_translation.resolve_provider(invalid)
             assert False, "Invalid translation provider should fail: " + invalid
@@ -183,16 +183,31 @@ def test_get_cached_translation_is_provider_specific():
     assert local["translation_status"] == "complete"
 
 
-def test_rejects_paid_provider_before_asking_model():
+def test_rejects_implicit_fallback_before_asking_model():
     with patch.object(subtitles, "get_subtitles") as load:
-        try:
-            subtitles.translate_subtitles(subtitles.TranslateRequest(
-                platform="youtube", video_id="M7lc1UVf-VE", translation_provider="openai:gpt-4.1"
-            ))
-            assert False
-        except HTTPException as exc:
-            assert exc.status_code == 400
+        for provider in ("auto", "free", "invalid:model"):
+            try:
+                subtitles.translate_subtitles(subtitles.TranslateRequest(
+                    platform="youtube", video_id="M7lc1UVf-VE", translation_provider=provider
+                ))
+                assert False
+            except HTTPException as exc:
+                assert exc.status_code == 400
     load.assert_not_called()
+
+
+def test_explicit_cloud_translation_uses_selected_provider():
+    fake = '{"translations":[{"id":0,"text":"你好"}]}'
+    for provider in ("gemini", "openai:gpt-4.1", "deepseek:deepseek-chat",
+                     "anthropic:claude-sonnet-4", "opencode:test-free"):
+        with patch.object(translation_cache, "get", return_value=None), \
+             patch.object(translation_cache, "put") as put, \
+             patch.object(subtitle_translation.llm_router, "generate", return_value=(fake, provider)) as call:
+            result, key = subtitle_translation.translate_batch([{"id":0,"text":"Hello"}], provider=provider)
+        assert result == [{"id":0,"translation":"你好"}]
+        assert key == provider
+        assert call.call_args.args[0] == provider
+        put.assert_called_once_with("Hello", provider, "你好")
 
 
 if __name__ == "__main__":
@@ -206,5 +221,6 @@ if __name__ == "__main__":
     test_bounded_batch()
     test_ollama_translation_uses_own_model_and_cache()
     test_get_cached_translation_is_provider_specific()
-    test_rejects_paid_provider_before_asking_model()
+    test_rejects_implicit_fallback_before_asking_model()
+    test_explicit_cloud_translation_uses_selected_provider()
     print("subtitle translation tests passed")

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import * as api from '../api.js'
 import { useI18n } from '../i18n/index.jsx'
 import { ollamaModelOptions } from '../utils/ollama-settings.js'
+import { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
+import { aiSourceLabel } from '../utils/ai-source.js'
 
 // 每個引擎一列：欄位名 → 標籤／說明／輸入型別
 const ENGINES = [
@@ -14,8 +16,9 @@ const ENGINES = [
 
 // state: 後端 /settings 回傳的公開狀態
 // mandatory: 首次啟動（尚未設定任何金鑰）→ 不可關閉，作為導引畫面
-export default function SettingsModal({ state, mandatory, onClose, onSaved, developerMode=false, onDeveloperModeChange }) {
+export default function SettingsModal({ state, mandatory, onClose, onSaved, provider='smart', providers={}, onProviderChange }) {
   const { t, lang, setLang, langs } = useI18n()
+  const [aiSelection, setAiSelection] = useState(provider)
   const [keys, setKeys] = useState({})   // 只放使用者「這次有輸入」的金鑰
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
   const [folder, setFolder] = useState(state?.obsidian_notes_folder || 'Youtube Card Reader')
@@ -35,19 +38,18 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
     setErr('')
     const payload = {
       // 金鑰：留空代表「維持原本設定」，只送有輸入的
-      ...(developerMode ? Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])) : {}),
+      ...Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
       // 這些總是送出（清空即代表停用）
-      ...(developerMode ? {
-        obsidian_vault_path: vault.trim(),
-        obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
-        ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
-        ollama_model: ollamaModel.trim(),
-      } : {}),
+      obsidian_vault_path: vault.trim(),
+      obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
+      ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
+      ollama_model: ollamaModel.trim(),
       output_language: outputLanguage,
     }
     setSaving(true)
     try {
       const next = await api.saveSettings(payload)
+      onProviderChange?.(aiSelection)
       onSaved?.(next)
     } catch (e) {
       setErr(t('settings.saveFailed', e.message))
@@ -68,8 +70,8 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
     }
   }
 
-  // 開發者模式打開設定時自動讀取已安裝模型，不必先按測試
-  useEffect(() => { if (developerMode) checkOllama() }, [developerMode])
+  // 所有人都能管理本地模型：開啟設定時自動偵測。
+  useEffect(() => { checkOllama() }, [])
 
   const modelOptions = ollamaModelOptions(ollamaStatus?.models, ollamaModel)
 
@@ -95,14 +97,26 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
             <span className="settings-hint">{t('settings.uiLanguageHint')}</span>
           </label>
 
-          <div className="settings-divider"><span>{t('settings.modeSection')}</span></div>
-          <label className="settings-mode-toggle">
-            <span className="settings-mode-copy">
-              <strong>{t('settings.developerMode')}</strong>
-              <small>{t('settings.developerModeHint')}</small>
-            </span>
-            <input type="checkbox" role="switch" checked={developerMode}
-                   onChange={e => onDeveloperModeChange?.(e.target.checked)}/>
+          <div className="settings-divider"><span>{t('ai.source')}</span></div>
+          <label className="settings-field">
+            <span className="settings-label">{t('ai.choose')}</span>
+            <select value={aiSelection} onChange={e=>setAiSelection(e.target.value)}>
+              <option value="smart">{t('ai.smart')}</option>
+              <optgroup label={t('ai.local')}>
+                {(providers?.ollama?.models||[]).map(model=><option key={model} value={`ollama:${model}`}>Ollama · {model}</option>)}
+              </optgroup>
+              <optgroup label={t('ai.cloud')}>
+                {PROVIDER_ORDER.filter(key=>key!=='ollama').flatMap(key=>
+                  (providers?.[key]?.models||[]).map(model=><option key={`${key}:${model}`} value={providerValue(key,model)}>
+                    {providers[key].label} · {model}{!providers[key].configured ? ` (${t('input.needsKey')})` : ''}
+                  </option>)
+                )}
+              </optgroup>
+              {aiSelection!=='smart' && !PROVIDER_ORDER.some(k=>(providers?.[k]?.models||[]).some(m=>providerValue(k,m)===aiSelection)) &&
+                <option value={aiSelection}>{aiSelection} ({t('ai.unavailable')})</option>}
+            </select>
+            <span className="settings-hint">{aiSourceLabel(aiSelection,aiSelection==='smart'?null:aiSelection,t)} · {t('ai.sharedHint')}</span>
+            <span className="settings-hint">{t('ai.localPlanned')}</span>
           </label>
 
           <div className="settings-divider"><span>{t('settings.output')}</span></div>
@@ -114,7 +128,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
             <span className="settings-hint">{t('settings.outputLanguageHint')}</span>
           </label>
 
-          {developerMode && <>
+          <details className="settings-advanced"><summary>{t('ai.connectionSettings')}</summary>
           <div className="settings-divider"><span>{t('settings.ollamaSection')}</span></div>
           <label className="settings-field">
             <span className="settings-label">{t('settings.ollamaUrl')}</span>
@@ -180,7 +194,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
                    placeholder="Youtube Card Reader"/>
           </label>
 
-          </>}
+          </details>
 
           {err && <p className="settings-err">{err}</p>}
         </div>

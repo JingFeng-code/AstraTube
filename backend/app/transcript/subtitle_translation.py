@@ -7,6 +7,7 @@ from typing import Any
 from json_repair import repair_json
 
 from app.llm import opencode, ollama
+from app.llm import router as llm_router
 from app.transcript import translation_cache
 
 MAX_BATCH = 16
@@ -63,7 +64,17 @@ def resolve_provider(provider: str = "opencode") -> tuple[str, str, str]:
         raw = provider[len("ollama:"):]
         model = ollama.validate_model(raw)
         return "ollama", model, f"ollama:{model}"
-    raise ValueError("字幕翻譯僅支援預設免費模型或明確指定的 Ollama 本地模型。")
+    # 新 UI 可明確選擇雲端 Provider；嚴格限制可用種類，避免 auto/free 隱藏接力。
+    if provider == "gemini":
+        return "gemini", "gemini", "gemini"
+    if ":" in provider:
+        import re
+        kind, model = provider.split(":", 1)
+        if kind in ("openai", "deepseek", "anthropic", "opencode") and re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}", model
+        ):
+            return kind, model, provider
+    raise ValueError("字幕翻譯需要明確選擇有效的 AI 模型。")
 
 
 def translate_batch(cues: list[dict], provider: str = "opencode") -> tuple[list[dict], str]:
@@ -96,9 +107,12 @@ def translate_batch(cues: list[dict], provider: str = "opencode") -> tuple[list[
         if engine == "ollama":
             # 僅發至同環境的 loopback Ollama；沒有跨供應商的自動 fallback。
             response, _ = ollama.generate(prompt, _SYSTEM, model=model)
-        else:
-            # 免費模型會無預警下架，只在免費模型之間接力（不會改用付費供應商）
+        elif provider == "opencode":
+            # 向後相容舊客戶端；新 UI 不會自動選這個免費接力模式。
             response, _ = opencode.generate_free([{"role": "user", "content": prompt}], _SYSTEM)
+        else:
+            # 使用者明確指定的 Provider；絕不透過 auto fallback 到其他付費服務。
+            response, _ = llm_router.generate(provider, prompt, _SYSTEM)
         translated = _validated_json(response, {r["id"] for r in missing})
         for item in missing:
             translation_cache.put(item["text"], cache_key, translated[item["id"]])
