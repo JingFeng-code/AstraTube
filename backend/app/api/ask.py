@@ -87,11 +87,11 @@ def ask(req: AskRequest) -> dict:
 
     if use_gemini:
         try:
-            text, label = gemini.generate_chat(chat, ask_system(transcript, True, language))
+            text, label = gemini.generate_chat(chat, ask_system(transcript, True, language), model=model)
             # 有掛搜尋工具時 generate_chat 會在標籤後加後綴；後綴文字隨介面語言變，
             # 所以比對「標籤有沒有被加料」而不是比對某個語言的字面值
             return {"answer": to_traditional(text, language), "model_used": label,
-                    "searched": label != gemini.LABEL}
+                    "searched": label != model}
         except NotConfiguredError as e:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
