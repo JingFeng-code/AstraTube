@@ -31,7 +31,7 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
         {sourceKey&&<span className="model-badge" title={t('deck.sourceTitle')}>{t(sourceKey)}</span>}
         <span className="deck-count">{t('deck.count',index+1,cards.length)}</span>
         {/* 實作的對象是整支影片，不是單張卡——所以按鈕在標題列，不在卡片上 */}
-        <details className="deck-advanced"><summary>{t('ai.advancedTools')}</summary><button className="btn-implement" onClick={onImplement} title={t(`implement.cta.${suggestedTrack}`)}</button></details>
+        <details className="deck-advanced"><summary>{t('ai.advancedTools')}</summary><button className="btn-implement" onClick={onImplement} title={t('implement.ctaTitle')}>{t(`implement.cta.${suggestedTrack}`)}</button></details>
       </div>
       {/* 重點導覽常駐頂部，不必捲到底才能切換 */}
       <div className="deck-nav deck-nav-top">
