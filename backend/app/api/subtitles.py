@@ -12,8 +12,7 @@ from typing import Literal
 
 from app.transcript import bilibili, cache, captions, translation_cache, subtitle_translation, imported_subtitles
 from app.llm import opencode
-from app.llm.base import ProviderError
-from app.llm.util import public_reason
+from app.llm.util import user_error
 
 router = APIRouter(prefix="/subtitles", tags=["subtitles"])
 _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -155,12 +154,11 @@ def translate_subtitles(req: TranslateRequest) -> dict:
         raise HTTPException(502, str(exc)) from exc
     except Exception as exc:
         # 供應商金鑰與原始逐字稿不得透過錯誤訊息洩漏給瀏覽器：服務端回應原文可能回顯它們，
-        # 所以只顯示狀態碼與我們自己寫的建議（public_reason）。Ollama 的錯誤訊息全由本機程式產生，可以直接顯示。
-        local = req.translation_provider.startswith("ollama:")
-        kind = "本機 Ollama" if local else "免費字幕"
-        detail = public_reason(exc) or (str(exc) if local and isinstance(exc, ProviderError) else "")
-        reason = f"（{detail[:240]}）" if detail else ""
-        raise HTTPException(502, f"{kind}翻譯服務暫時無法使用{reason}，請檢查連線或模型設定。") from exc
+        # 所以只顯示狀態碼與我們自己寫的建議（user_error）。
+        provider = req.translation_provider
+        kind = ("本機 Ollama" if provider.startswith("ollama:") else
+                "免費模型" if provider == "opencode" else "雲端 AI")
+        raise HTTPException(502, f"{kind}：{user_error(exc, provider)}") from exc
     return {
         "platform": req.platform,
         "video_id": req.video_id,

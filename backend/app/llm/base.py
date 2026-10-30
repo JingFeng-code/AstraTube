@@ -39,6 +39,10 @@ class KeyExhaustedError(ProviderError):
 class EmptyResponseError(ProviderError):
     """模型回了 200 但內容是空的（reasoning 模型常見）——屬暫時性，值得重試。"""
 
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.public_message = message  # 訊息只含供應商名稱與過濾後的結束原因，可以顯示
+
 
 class LLMProvider(Protocol):
     """文字生成供應商：回傳 (生成文字, 模型標籤)。"""

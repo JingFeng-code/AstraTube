@@ -84,12 +84,56 @@ def _status_hint(status: int) -> str:
     return ""
 
 
+# 空回應時可以顯示的結束原因（OpenAI 相容服務與 Anthropic 的標準值）
+_KNOWN_FINISH_REASONS = frozenset({
+    "stop", "length", "content_filter", "tool_calls", "function_call",
+    "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal",
+})
+
+
+def safe_finish_reason(value: Any) -> str:
+    """結束原因由上游提供，可能夾帶任意文字；只放行已知的值，其餘一律不顯示原文。"""
+    return value if isinstance(value, str) and value in _KNOWN_FINISH_REASONS else "unknown"
+
+
 def public_reason(error: Exception) -> str:
     """可以安全顯示給瀏覽器的原因：只含狀態碼與我們自己寫的建議，不含服務端回應原文。
 
     服務端錯誤內容可能回顯金鑰或送出去的字幕，這類內容只留在後端紀錄。
     """
     return getattr(error, "public_message", "") or ""
+
+
+def user_error(error: Exception | None, provider: str | None = None) -> str:
+    """給瀏覽器看的錯誤文字。絕不回傳上游回應內容：它可能回顯金鑰或送出去的字幕。
+
+    例外本身的 str() 只有確定由我們自己產生時才能用；其餘只說狀態碼或通用說明，
+    完整內容留在後端紀錄。Ollama 的錯誤訊息全由本機程式產生，可以直接顯示。
+    """
+    from app.llm.base import NotConfiguredError, ProviderError, RefusalError
+    if error is None:
+        return messages.t("provider.failed_generic")
+    public = public_reason(error)
+    if public:
+        return public
+    if isinstance(error, (ValueError, NotConfiguredError, RefusalError)):
+        return str(error)
+    if (provider or "").startswith("ollama:") and isinstance(error, ProviderError):
+        return str(error)
+    code = getattr(error, "code", None) or getattr(error, "status_code", None)
+    try:
+        status = int(code)
+    except (TypeError, ValueError):
+        return messages.t("provider.failed_generic")
+    return f"HTTP {status} {_status_hint(status)}".strip()
+
+
+def response_error(vendor: str, message: str) -> "ProviderError":
+    """上游回了無法使用的內容：message 可含內容摘要供後端紀錄，公開訊息只說明狀況。"""
+    from app.llm.base import ProviderError
+    error = ProviderError(message)
+    error.public_message = messages.t("provider.bad_response", vendor=vendor)
+    return error
 
 
 def http_error(vendor: str, status: int, body: str) -> "ProviderError":

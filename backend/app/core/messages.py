@@ -355,6 +355,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "Gemini 影片呼叫失敗",
         "en": "The Gemini video call failed",
     },
+    "provider.failed_generic": {
+        "zh-Hant": "模型服務呼叫失敗，請稍後再試或更換模型。",
+        "en": "The model service call failed. Try again later or switch models.",
+    },
+    "provider.bad_response": {
+        "zh-Hant": "{vendor} 回傳了無法使用的內容，請稍後再試或更換模型。",
+        "en": "{vendor} returned something unusable. Try again later or switch models.",
+    },
     "provider.truncated": {
         "zh-Hant": "{vendor} 的回覆超過輸出上限，內容被截斷。可以縮短內容或改用額度較高的模型。",
         "en": "{vendor} hit its output limit and the reply was cut off. Shorten the content or use a model with a higher limit.",
@@ -376,8 +384,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "No usable AI is selected. Open AI settings to connect Ollama or choose a cloud provider.",
     },
     "llm.free_chain_failed": {
-        "zh-Hant": "OpenCode 免費模型目前都無法使用（已試：{models}），請稍後再試；開發者模式也可以改用本地 Ollama。",
-        "en": "No free OpenCode model is available right now (tried: {models}). Try again later, or use local Ollama in developer mode.",
+        "zh-Hant": "OpenCode 免費模型目前都無法使用（已試：{models}），請稍後再試，或到 AI 設定改用本機 Ollama。",
+        "en": "No free OpenCode model is available right now (tried: {models}). Try again later, or switch to local Ollama in AI settings.",
     },
 }
 

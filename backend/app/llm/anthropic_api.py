@@ -10,8 +10,8 @@ from typing import Any, Callable, Tuple
 
 from app.core import config, messages
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
-                          ProviderError, RefusalError)
-from app.llm.util import with_retry
+                          RefusalError)
+from app.llm.util import connect_error, http_error, safe_finish_reason, with_retry
 
 LABEL = "Claude"
 CONSOLE_URL = "https://console.anthropic.com/settings/keys"
@@ -98,10 +98,9 @@ def _once(model: str, chat_messages: list[dict], system: str) -> str:
         )
     except anthropic.APIStatusError as e:
         # 429／5xx 交給 with_retry 判定為暫時性錯誤；其餘（400/401/404）立即失敗
-        raise ProviderError(messages.t("provider.http_error", vendor=LABEL,
-                                       status=e.status_code, detail=str(e)[:200]))
+        raise http_error(LABEL, e.status_code, str(e))
     except anthropic.APIConnectionError as e:
-        raise ProviderError(messages.t("provider.connect_failed", vendor=LABEL, error=e))
+        raise connect_error(LABEL, e)
 
     # 安全分類器可能婉拒請求：HTTP 200 但 stop_reason 是 refusal，content 為空或只有片段。
     # 這是內容層面的結果不是錯誤，重試同一份 prompt 沒有意義，要直接讓使用者換模型。
@@ -116,7 +115,7 @@ def _once(model: str, chat_messages: list[dict], system: str) -> str:
     if not text.strip():
         raise EmptyResponseError(messages.t(
             "provider.empty_response", vendor=LABEL,
-            reason=f"stop_reason={getattr(resp, 'stop_reason', None)}"))
+            reason=f"stop_reason={safe_finish_reason(getattr(resp, 'stop_reason', None))}"))
     return text
 
 

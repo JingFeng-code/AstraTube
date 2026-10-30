@@ -22,6 +22,7 @@ from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import router as llm_router
 from app.llm.base import TruncatedOutputError
+from app.llm.util import user_error
 from app.models.schemas import ImplementRequest, RevealRequest
 from app.llm import gemini
 from app.prompts.implement import (FILE_BEGIN, FILE_END, TRACKS, resolve_track,
@@ -251,7 +252,7 @@ def implement(req: ImplementRequest) -> StreamingResponse:
             except Exception as e:  # noqa: BLE001
                 # 連便宜模型都失敗時，至少把後端已知的安裝資訊原樣給出去
                 yield line({"type": "teach", "content": _fallback_teach(), "model": "",
-                            "note": str(e)[:120]})
+                            "note": user_error(e, req.provider)})
             return
 
         cli_model = (req.cli_model or "").strip()
@@ -296,7 +297,8 @@ def implement(req: ImplementRequest) -> StreamingResponse:
                 return
             except Exception as e:  # noqa: BLE001
                 yield line({"type": "fatal",
-                            "error": messages.t("implement.api_failed", label=label, error=e),
+                            "error": messages.t("implement.api_failed", label=label,
+                                                error=user_error(e, api_provider)),
                             "workdir": str(workdir)})
                 return
             parsed = parse_inline_files(raw)

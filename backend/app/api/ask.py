@@ -10,6 +10,7 @@ from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm import router as llm_router
 from app.llm.base import NotConfiguredError, RefusalError, TruncatedOutputError
 from app.llm.budget import estimate_tokens, summary_budget, trim_to_tokens
+from app.llm.util import user_error
 from app.models.schemas import AskRequest
 from app.prompts.ask import ask_system
 from app.transcript import cache, captions, bilibili, imported_subtitles
@@ -119,7 +120,7 @@ def ask(req: AskRequest) -> dict:
             raise HTTPException(400, str(e))
         except Exception as e:  # noqa: BLE001
             if kind == llm_router.GEMINI:
-                raise HTTPException(500, messages.t("ask.failed", error=e))
+                raise HTTPException(500, messages.t("ask.failed", error=user_error(e, req.provider)))
             print(f"[ask] Gemini 失敗，改試其他供應商：{e}", flush=True)
 
     transcript, trimmed = _fit_budget(req.provider, transcript, chat, language)
@@ -156,4 +157,4 @@ def ask(req: AskRequest) -> dict:
             return {"answer": to_traditional(text, language), "model_used": label, "searched": False}
         except Exception as e:  # noqa: BLE001
             last = e
-    raise HTTPException(500, messages.t("ask.failed", error=last))
+    raise HTTPException(500, messages.t("ask.failed", error=user_error(last, req.provider)))
