@@ -2,6 +2,8 @@
 import asyncio
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +19,7 @@ from app.llm.budget import GroqPacer, _seconds, summary_budget, estimate_tokens,
 from app.llm.util import is_transient, public_reason
 from app.models.schemas import AskRequest, DeepDiveRequest, SummarizeRequest
 from app.transcript import subtitle_translation
+from app.services.chunker import MAX_CHUNKS
 from app.prompts.summarize import (budget_summarize_prompt, budget_summarize_system,
                                    summarize_prompt)
 
@@ -289,7 +292,67 @@ def test_truncated_translation_is_not_cached():
     put.assert_not_called()
 
 
+def test_pacer_wait_does_not_block_other_models():
+    pacer = GroqPacer()
+    pacer._states["busy"] = {"next_at": time.monotonic() + 1.5, "tpm": 8000,
+                             "remaining": None, "reset_at": 0.0}
+    waiter = threading.Thread(target=pacer.before, args=("busy", 10))
+    waiter.start()
+    time.sleep(0.2)
+    started = time.monotonic()
+    pacer.limit_for("other")
+    pacer.before("other", 10)
+    pacer.observe("other", {"x-ratelimit-limit-tokens": "9000"})
+    assert time.monotonic() - started < 0.5, "等待中的模型不可以卡住其他模型"
+    waiter.join()
+
+
+def test_pacer_still_queues_requests_for_same_model():
+    pacer = GroqPacer()
+    sleeps = []
+    with patch("app.llm.budget.time.sleep", side_effect=sleeps.append), \
+         patch("app.llm.budget.time.monotonic", return_value=100.0):
+        pacer.before("m", 3000)  # 未知模型預設 6000 TPM：佔用 30 秒
+        pacer.before("m", 3000)
+        pacer.before("m", 3000)
+    assert sleeps == [30.0, 60.0], "同模型的請求仍要排隊，不可一起送出"
+
+
+def _long_transcript(lines=6000):
+    return "\n".join(f"[{i * 5}] this is one transcript line of normal spoken content here"
+                     for i in range(lines))
+
+
+def test_long_video_is_limited_not_merged_into_giant_tail():
+    source = {"type": "youtube", "video_id": "dQw4w9WgXcQ", "text": _long_transcript(),
+              "has_timestamps": True, "transcript_source": "captions"}
+    sizes = []
+    def fake_run(_req, _source, chunk, index, multi, on_status=None):
+        sizes.append(len(chunk))
+        return ({"title": "t", "cards": [{"heading": "h", "summary": "s"}]}, "Groq/m")
+    with patch.object(summary_api, "route_content", return_value=source), \
+         patch.object(summary_api, "_run_segment", side_effect=fake_run):
+        events = asyncio.run(_events(summary_api.summarize_stream(SummarizeRequest(
+            url="https://example.com", provider="groq:qwen/qwen3.8-27b"))))
+    assert len(sizes) == MAX_CHUNKS
+    assert max(sizes) < 2400, "最後一段不可以合併成超大段"
+    limited = next(e for e in events if e["type"] == "coverage_limited")
+    assert limited["skipped"] > 0 and limited["covered_until"] > 0
+    assert events[-1]["skipped_segments"] == limited["skipped"]
+
+
+def test_long_video_on_other_providers_keeps_everything():
+    text = _long_transcript()
+    source = {"type": "youtube", "video_id": "dQw4w9WgXcQ", "text": text, "has_timestamps": True}
+    chunks, skipped = summary_api._split(source, "openai:gpt-x")
+    assert skipped == 0 and "\n".join(chunks) == text
+
+
 if __name__ == "__main__":
+    test_pacer_wait_does_not_block_other_models()
+    test_pacer_still_queues_requests_for_same_model()
+    test_long_video_is_limited_not_merged_into_giant_tail()
+    test_long_video_on_other_providers_keeps_everything()
     test_summary_cap_does_not_apply_to_other_calls()
     test_summary_segment_passes_its_own_cap()
     test_ask_trims_long_transcript_instead_of_failing()

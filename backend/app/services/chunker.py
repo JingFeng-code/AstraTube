@@ -9,10 +9,13 @@ MAX_CHUNKS = 60  # 安全上限，避免異常超長輸入造成過多呼叫
 MIN_TAIL_RATIO = 0.25
 
 
-def chunk_content(text: str, is_youtube: bool, chunk_chars: int = CHUNK_CHARS):
+def chunk_content(text: str, is_youtube: bool, chunk_chars: int = CHUNK_CHARS,
+                  merge_overflow: bool = True):
     """回傳片段列表。短內容回傳單一片段（行為與原本相同）。
     - YouTube：以「行」(每行 [秒數] 文字) 為單位切，保持時間戳完整。
     - 文章：以句子為單位切。
+    - merge_overflow=False：超過 MAX_CHUNKS 也不合併，由呼叫端決定怎麼處理。
+      有額度限制的模型不能合併，否則最後一段會大到必定失敗。
     """
     text = text or ""
     if len(text) <= chunk_chars:
@@ -41,7 +44,7 @@ def chunk_content(text: str, is_youtube: bool, chunk_chars: int = CHUNK_CHARS):
         chunks.pop()
 
     # 超過上限時，把多餘片段合併進最後一段，確保內容不遺漏
-    if len(chunks) > MAX_CHUNKS:
+    if merge_overflow and len(chunks) > MAX_CHUNKS:
         head = chunks[:MAX_CHUNKS - 1]
         tail = sep.join(chunks[MAX_CHUNKS - 1:])
         chunks = head + [tail]
