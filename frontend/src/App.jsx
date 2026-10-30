@@ -54,6 +54,7 @@ function GenerationProgress({ progress }){
   let label=t('progress.generate')
   if(progress.stage==='source') label=t('progress.source')
   else if(progress.phase==='coverage') label=t('progress.coverage',seg,model)
+  else if(progress.state==='rate_wait') label=t('progress.rateWait',seg,apiName,progress.delay||0)
   else if(progress.state==='retry_wait') label=t('progress.retry',seg,apiName,progress.delay||0,progress.attempt||'',progress.tries||'')
   else if(progress.state==='model_switch') label=t('progress.modelSwitch',seg,progress.model)
   else if(progress.state==='key_switch') label=t('progress.keySwitch',seg)
