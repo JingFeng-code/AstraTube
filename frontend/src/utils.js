@@ -3,6 +3,11 @@ export function fmtTime(sec) {
   const s=Math.max(0,Math.floor(sec)),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=String(s%60).padStart(2,'0')
   return h>0?`${h}:${String(m).padStart(2,'0')}:${ss}`:`${m}:${ss}`
 }
+// 涵蓋範圍受限的提示：資料存在摘要結果裡，重新載入後也要告訴使用者這份摘要不完整
+export function coverageNotice(coverage,t){
+  if(!coverage?.skipped) return ''
+  return t('stream.coverageLimited',coverage.skipped,coverage.covered_until?fmtTime(coverage.covered_until):'')
+}
 export const youtubeLink=(id,sec)=>sec!=null?`https://www.youtube.com/watch?v=${id}&t=${Math.floor(sec)}s`:`https://www.youtube.com/watch?v=${id}`
 export const TRANSCRIPT_KEYS=['transcript_highlight','transcript','key_transcript','quote','original_text']
 export const TRANSLATION_KEYS=['translation','translated_text','zh_translation']
