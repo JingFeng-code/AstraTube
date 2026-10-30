@@ -301,6 +301,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `Appended to: ${p}`,
     'toast.saveFailed': (m) => `Save failed: ${m}`,
     'toast.deepdiveFailed': (m) => `Deep dive failed: ${m}`,
+    'stream.coverageLimited': (n, until) => `This video is too long for this model's limit: only the first part${until ? ` (up to ${until})` : ''} will be analyzed, and the remaining ${n} parts are skipped. Use a model with a higher limit to cover the whole video.`,
     'toast.segTruncated': (n) => `Part ${n} hit the model's output limit, so its cards may be incomplete`,
     'toast.segFailed': (n, reason) => `Part ${n} failed and was skipped${reason ? `: ${reason}` : ''}`,
 
@@ -616,6 +617,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `已附加到：${p}`,
     'toast.saveFailed': (m) => `存檔失敗：${m}`,
     'toast.deepdiveFailed': (m) => `深入解析失敗：${m}`,
+    'stream.coverageLimited': (n, until) => `這支影片超過目前模型的額度：只會分析前段${until ? `（到 ${until}）` : ''}，後面 ${n} 段不會處理。要分析完整影片，請改用額度較高的模型。`,
     'toast.segTruncated': (n) => `第 ${n} 段超過模型的輸出上限，這段的卡片可能不完整`,
     'toast.segFailed': (n, reason) => `第 ${n} 段生成失敗，已跳過${reason ? `：${reason}` : ''}`,
 

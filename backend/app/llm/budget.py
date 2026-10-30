@@ -125,15 +125,16 @@ class GroqPacer:
             delay = max(0.0, state["next_at"] - now)
             if remaining is not None and remaining < estimated:
                 delay = max(delay, max(0.0, state["reset_at"] - now))
-            if delay > 0:
-                if on_status:
-                    on_status({"state": "rate_wait", "provider": "groq",
-                               "model": model, "delay": math.ceil(delay)})
-                time.sleep(delay)
             # Reserve pessimistically before any network request starts.
-            state["next_at"] = time.monotonic() + 60.0 * estimated / max(1, state["tpm"])
+            # 先佔好時段再放開鎖：同模型的請求照樣排隊，但其他模型與查詢不會被這次等待卡住
+            state["next_at"] = now + delay + 60.0 * estimated / max(1, state["tpm"])
             if state["remaining"] is not None:
                 state["remaining"] = max(0, state["remaining"] - estimated)
+        if delay > 0:
+            if on_status:
+                on_status({"state": "rate_wait", "provider": "groq",
+                           "model": model, "delay": math.ceil(delay)})
+            time.sleep(delay)
 
     def observe(self, model: str, headers: Mapping[str, str]) -> None:
         with self._lock:

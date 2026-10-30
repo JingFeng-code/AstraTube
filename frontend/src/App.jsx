@@ -198,6 +198,7 @@ export default function App() {
       )}
       <GenerationProgress progress={stream.progress}/>
       {stream.error&&<p className="error-bar">{stream.error}</p>}
+      {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className="workspace" ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>

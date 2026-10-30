@@ -20,7 +20,7 @@ from app.models.schemas import DeepDiveRequest, SummarizeRequest
 from app.prompts.summarize import (deepdive_prompt, deepdive_system,
                                    summarize_prompt, summarize_system,
                                    budget_summarize_prompt, budget_summarize_system)
-from app.services.chunker import chunk_content
+from app.services.chunker import MAX_CHUNKS, chunk_content
 from app.transcript.router import Content, route_content
 
 router = APIRouter(tags=["summarize"])
@@ -113,8 +113,23 @@ def _allows_cloud_transcription(provider: str | None) -> bool:
     return kind in (llm_router.AUTO, llm_router.GEMINI)
 
 
-def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
-    """擷取內容並切段，回傳 (內容, 片段列表, 是否多段)。"""
+def _split(content: Content, provider: str | None) -> Tuple[list[str], int]:
+    """切段，回傳 (要處理的片段, 超出上限而略過的段數)。
+
+    有額度預算的模型每段都很小，超過段數上限時只處理前段並如實回報，
+    不能把多出來的內容塞進最後一段（那一段會大到必定失敗）。
+    """
+    has_ts = bool(content.get("has_timestamps") or content["type"] == "youtube")
+    profile = summary_budget(provider)
+    if not profile:
+        return chunk_content(content["text"], has_ts), 0
+    chunks = chunk_content(content["text"], has_ts, chunk_chars=profile.chunk_chars,
+                           merge_overflow=False)
+    return chunks[:MAX_CHUNKS], max(0, len(chunks) - MAX_CHUNKS)
+
+
+def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool, int]:
+    """擷取內容並切段，回傳 (內容, 片段列表, 是否多段, 略過的段數)。"""
     if not llm_router.is_explicit(req.provider):
         raise HTTPException(400, messages.t("llm.no_provider"))
     try:
@@ -125,11 +140,8 @@ def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, messages.t("summarize.fetch_failed", error=e))
 
-    has_ts = content.get("has_timestamps") or content["type"] == "youtube"
-    profile = summary_budget(req.provider)
-    chunks = (chunk_content(content["text"], bool(has_ts), chunk_chars=profile.chunk_chars)
-              if profile else chunk_content(content["text"], bool(has_ts)))
-    return content, chunks, len(chunks) > 1
+    chunks, skipped = _split(content, req.provider)
+    return content, chunks, len(chunks) > 1, skipped
 
 
 _TS_LINE = re.compile(r"^\[(\d+)\]", re.M)
@@ -247,7 +259,7 @@ def _run_segment(req: SummarizeRequest, content: Content, chunk: str,
 @router.post("/summarize")
 def summarize(req: SummarizeRequest) -> dict:
     """一次回傳全部卡片（不串流）。單一片段失敗會跳過，全部失敗才報錯。"""
-    content, chunks, multi = _prepare(req)
+    content, chunks, multi, skipped = _prepare(req)
 
     all_cards: list[dict] = []
     title: str | None = None
@@ -284,7 +296,7 @@ def summarize(req: SummarizeRequest) -> dict:
             "content_type": _pick_content_type(content_types),
             "cards": all_cards, "model_used": "、".join(models_used),
             "segments": len(chunks), "failed_segments": failed,
-            "truncated_segments": truncated}
+            "truncated_segments": truncated, "skipped_segments": skipped}
 
 
 @router.post("/summarize_stream")
@@ -307,10 +319,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
         try:
             content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))
-            has_ts = content.get("has_timestamps") or content["type"] == "youtube"
             profile = summary_budget(req.provider)
-            chunks = (chunk_content(content["text"], bool(has_ts), chunk_chars=profile.chunk_chars)
-                      if profile else chunk_content(content["text"], bool(has_ts)))
+            chunks, skipped = _split(content, req.provider)
         except ValueError as e:
             yield line({"type": "fatal", "error": str(e)})
             return
@@ -327,6 +337,9 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             "bilibili_page": content.get("bilibili_page"),
                     "transcript_source": content.get("transcript_source"),
                     "segments": len(chunks), "workers": workers})
+        if skipped:
+            yield line({"type": "coverage_limited", "skipped": skipped,
+                        "covered_until": _last_ts(chunks[-1])})
         title: str | None = None
         models_used: list[str] = []
         content_types: list[str] = []   # 依段落順序 append（emit 是嚴格時間序），供多數決
@@ -395,7 +408,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
         yield line({"type": "done", "title": title or messages.t("summarize.untitled"),
                     "model_used": "、".join(models_used), "segments": len(chunks),
                     "content_type": _pick_content_type(content_types),
-                    "failed_segments": failed, "total_cards": total})
+                    "failed_segments": failed, "total_cards": total,
+                    "skipped_segments": skipped})
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 
