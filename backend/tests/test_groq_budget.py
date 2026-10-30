@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.api import summarize as summary_api
 from app.llm import openai_compat
-from app.llm.budget import GroqPacer, _seconds, summary_budget, estimate_tokens
+from app.llm.budget import GroqPacer, _seconds, summary_budget, estimate_tokens, groq_pacer
 from app.llm.util import is_transient, public_reason
 from app.models.schemas import SummarizeRequest
 from app.prompts.summarize import (budget_summarize_prompt, budget_summarize_system,
@@ -23,6 +23,9 @@ def test_only_groq_uses_lower_budget():
     assert qwen is not None and qwen.chunk_chars < 12_000
     assert 0 < qwen.max_completion_tokens < qwen.tokens_per_minute
     assert qwen.workers == 1
+    with patch.object(groq_pacer, "limit_for", return_value=4000):
+        reduced = summary_budget("groq:qwen/qwen3.8-27b")
+        assert reduced.chunk_chars == 900 and reduced.max_completion_tokens == 700
     assert summary_budget("openai:gpt-4o") is None
     assert summary_budget("ollama:qwen3:4b") is None
 
