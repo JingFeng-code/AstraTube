@@ -19,6 +19,10 @@ _KEY_FIELDS = (
     ("deepseek_api_key", "DEEPSEEK_API_KEY"),
     ("openai_api_key", "OPENAI_API_KEY"),
     ("anthropic_api_key", "ANTHROPIC_API_KEY"),
+    ("openrouter_api_key", "OPENROUTER_API_KEY"),
+    ("groq_api_key", "GROQ_API_KEY"),
+    ("mistral_api_key", "MISTRAL_API_KEY"),
+    ("together_api_key", "TOGETHER_API_KEY"),
 )
 
 
@@ -59,7 +63,7 @@ def _public_state() -> dict:
         state[f"{name}_set"] = bool(raw)
         state[f"{name}_preview"] = (messages.t("settings.key_count", count=len(g_keys))
                                     if name == "gemini" and len(g_keys) > 1 else _mask(raw))
-    # 一把金鑰都沒有時顯示導引畫面（OpenCode 免費模型其實不需金鑰，但仍值得提示一次）
+    # 回傳金鑰是否已設定（不代表驗證通過）；無金鑰仍可使用本機 Ollama。
     state["configured"] = any(state[f"{f.removesuffix('_api_key')}_set"] for f, _ in _KEY_FIELDS)
     return state
 
