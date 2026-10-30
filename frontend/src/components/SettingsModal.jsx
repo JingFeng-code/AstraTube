@@ -10,9 +10,14 @@ const KEY_FIELDS = {
   openai: 'openai_api_key',
   deepseek: 'deepseek_api_key',
   anthropic: 'anthropic_api_key',
+  openrouter: 'openrouter_api_key',
+  groq: 'groq_api_key',
+  mistral: 'mistral_api_key',
+  together: 'together_api_key',
 }
 function sourceParts(value = 'smart') {
-  if (value === 'smart') return { engine: 'smart', model: '' }
+  if (value === 'smart' || value === 'free' || value === 'auto' ||
+      value === 'opencode' || value.startsWith('opencode:')) return { engine: 'smart', model: '' }
   if (value === 'gemini') return { engine: 'gemini', model: '' } // 舊版 Gemini 無模型後綴
   const colon = value.indexOf(':')
   return colon < 1 ? { engine: 'smart', model: '' } :
@@ -24,6 +29,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
   const initial = sourceParts(provider)
   const [engine, setEngine] = useState(initial.engine)
   const [model, setModel] = useState(initial.model)
+  const [modelSearch, setModelSearch] = useState('')
   const [keys, setKeys] = useState({})
   const [connection, setConnection] = useState(null)
   const [checking, setChecking] = useState(false)
@@ -42,6 +48,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
   const isSmart = engine === 'smart'
   const verified = !!connection?.connected && connection.provider === engine
   const available = verified ? connection.models : []
+  const visibleModels = available.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
   const chosenSource = isSmart ? 'smart' : model ? providerValue(engine, model) : ''
   const unchangedSource = chosenSource === provider || (provider === 'gemini' && engine === 'gemini' && !model)
 
@@ -50,6 +57,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
     setEngine(next)
     setModel(next === initial.engine ? initial.model : '')
     setConnection(null)
+    setModelSearch('')
     setChecking(false)
     setErr('')
   }
@@ -88,7 +96,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
     }
   }
 
-  // 已設定金鑰不用再輸入；本機與匿名服務也可直接檢查連線。
+  // 已設定金鑰不用再輸入；本機 Ollama 可直接檢查連線。
   // 只檢查目前所選的供應商，不同時向所有雲端服務發出請求。
   useEffect(() => {
     if (engine === 'smart' || (KEY_FIELDS[engine] && !state?.[`${engine}_set`])) return
@@ -154,11 +162,8 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
               <optgroup label={t('ai.local')}>
                 <option value="ollama">Ollama</option>
               </optgroup>
-              <optgroup label={t('ai.freeServices')}>
-                <option value="opencode">{providers?.opencode?.label || 'OpenCode'}</option>
-              </optgroup>
               <optgroup label={t('ai.cloud')}>
-                {PROVIDER_ORDER.filter(p=>p!=='ollama' && p!=='opencode').map(p=>
+                {PROVIDER_ORDER.filter(p=>p!=='ollama').map(p=>
                   <option key={p} value={p}>{providers?.[p]?.label || p}</option>
                 )}
               </optgroup>
@@ -189,14 +194,19 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
                 {verified ? t('ai.verified', available.length) : checking ? t('ai.verifying') : ''}
               </p>
             </div>
-            {verified && <label className="settings-field">
+            {verified && <div className="settings-field">
               <span className="settings-label">{t('ai.chooseModel')}</span>
+              {available.length > 20 && <input type="search" value={modelSearch}
+                onChange={e=>setModelSearch(e.target.value)}
+                placeholder={t('ai.searchModel')} aria-label={t('ai.searchModel')} />}
               <select value={model} onChange={e=>setModel(e.target.value)} disabled={!available.length}>
                 <option value="">{t('ai.selectModel')}</option>
-                {available.map(m=><option key={m} value={m}>{m}</option>)}
+                {model && !visibleModels.includes(model) &&
+                  <option value={model}>{model}</option>}
+                {visibleModels.map(m=><option key={m} value={m}>{m}</option>)}
               </select>
               <span className="settings-hint">{available.length ? t('ai.modelsLiveHint') : t('ai.noModels')}</span>
-            </label>}
+            </div>}
           </>}
           <p className="settings-hint">{t('ai.sharedHint')}</p>
           <p className="settings-hint">{t('ai.localPlanned')}</p>
