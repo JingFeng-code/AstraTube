@@ -94,6 +94,7 @@ export default function App() {
   const stream = useSummarizeStream({
     initialResult: SAVED.result||null,
     onSegError: ev=>showToast(t('toast.segFailed',ev.seg+1,typeof ev.error==='string'?ev.error.trim().slice(0,160):''),true),
+    onSegTruncated: ev=>showToast(t('toast.segTruncated',ev.seg+1),true),
     t,
   })
   const { result } = stream

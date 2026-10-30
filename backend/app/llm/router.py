@@ -76,7 +76,8 @@ def _default_model(kind: str) -> str:
 
 
 def _call(kind: str, model: str, prompt: str, system: str, seg: int,
-          on_status: Callable[[dict[str, Any]], None] | None) -> Tuple[str, str]:
+          on_status: Callable[[dict[str, Any]], None] | None,
+          max_completion_tokens: int | None = None) -> Tuple[str, str]:
     """對單一供應商發一次生成請求。"""
     if kind == GEMINI:
         return gemini.generate(prompt, system, seg=seg, on_status=on_status, model=model)
@@ -86,7 +87,8 @@ def _call(kind: str, model: str, prompt: str, system: str, seg: int,
         return anthropic_api.generate(prompt, system, model=model, on_status=on_status)
     if kind in openai_compat.VENDORS:
         return openai_compat.generate(openai_compat.VENDORS[kind], prompt, system,
-                                      model=model, on_status=on_status)
+                                      model=model, on_status=on_status,
+                                      max_completion_tokens=max_completion_tokens)
     return opencode.generate(prompt, system, model=model, seg=seg, on_status=on_status)
 
 
@@ -108,8 +110,12 @@ def configured_paid_chain() -> list[Tuple[str, str]]:
 
 
 def generate(provider: Optional[str], prompt: str, system: str = "", seg: int = 0,
-             on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
-    """回傳 (文字, 實際產生答案的模型標籤)。seg 是段落索引，用來錯開 Gemini 金鑰。"""
+             on_status: Callable[[dict[str, Any]], None] | None = None,
+             max_completion_tokens: int | None = None) -> Tuple[str, str]:
+    """回傳 (文字, 實際產生答案的模型標籤)。seg 是段落索引，用來錯開 Gemini 金鑰。
+
+    max_completion_tokens 只有指定單一 OpenAI 相容供應商時才會生效。
+    """
     require_explicit(provider)
     kind, model = parse(provider)
     chat = [{"role": "user", "content": prompt}]
@@ -117,7 +123,7 @@ def generate(provider: Optional[str], prompt: str, system: str = "", seg: int = 
     if kind == FREE:
         return opencode.generate_free(chat, system, on_status=on_status)
     if kind != AUTO:
-        return _call(kind, model, prompt, system, seg, on_status)
+        return _call(kind, model, prompt, system, seg, on_status, max_completion_tokens)
 
     # 自動模式：先跑 OpenCode 免費模型接力（單模型重試 2 次就換下一個），
     # 整條鏈耗盡才依序備援到有金鑰的付費供應商。

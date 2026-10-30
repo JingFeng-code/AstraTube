@@ -10,9 +10,9 @@ from typing import Any, Callable, Tuple
 import httpx
 
 from app.core import config, messages
-from app.llm.budget import groq_pacer, summary_budget, estimate_tokens
+from app.llm.budget import MIN_GROQ_OUTPUT, groq_pacer, summary_budget, estimate_tokens
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
-                          ProviderError)
+                          ProviderError, TruncatedOutputError)
 from app.llm.util import connect_error, http_error, with_retry
 
 # 推理型模型（deepseek-reasoner、gpt-5 thinking 等）單次摘要可能跑數分鐘，讀取逾時要給足
@@ -139,25 +139,31 @@ def list_models(vendor: Vendor) -> Tuple[list[str], str]:
 def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
                max_completion_tokens: int | None = None,
                on_status: Callable[[dict[str, Any]], None] | None = None) -> str:
-    """打一次 /chat/completions。Groq 按模型額度限制輸出並配速。"""
+    """打一次 /chat/completions。Groq 按模型額度配速。
+
+    呼叫端有給 max_completion_tokens 才照用（摘要）；Groq 沒給時用完這一分鐘剩下的額度，
+    其他供應商則不設上限。回覆被截斷時拋 TruncatedOutputError，不會假裝是完整內容。
+    """
     request = {"model": model, "messages": chat_messages}
     if vendor.key == "groq":
         budget = summary_budget(f"groq:{model}")
         if budget:
-            max_completion_tokens = min(max_completion_tokens or budget.max_completion_tokens,
-                                        budget.max_completion_tokens)
-            request["max_completion_tokens"] = max_completion_tokens
+            estimated = estimate_tokens(chat_messages)
+            room = budget.tokens_per_minute - estimated
+            cap = max_completion_tokens or room
+            if cap > room or room < MIN_GROQ_OUTPUT:
+                err = ProviderError("Groq 輸入加輸出預算超過目前的保守每分鐘限額，請縮短內容。")
+                err.public_message = "Groq 單次請求過大；請減少輸入內容或更換較高額度的模型。"
+                raise err
+            request["max_completion_tokens"] = cap
             # Groq Qwen 3.8 支援 none（不消耗思考 Token），比較適合精簡 JSON 卡片。
             # GPT-OSS 不支援 none，改用 low；不要把此選項套到其他模型。
             if model == "qwen/qwen3.8-27b":
                 request["reasoning_effort"] = "none"
             elif model in ("openai/gpt-oss-20b", "openai/gpt-oss-120b"):
                 request["reasoning_effort"] = "low"
-            planned = estimate_tokens(chat_messages) + max_completion_tokens
-            if planned > budget.tokens_per_minute:
-                err = ProviderError("Groq 輸入加輸出預算超過目前的保守每分鐘限額，請縮短內容。")
-                err.public_message = "Groq 單次請求過大；請減少輸入內容或更換較高額度的模型。"
-                raise err
+            # 配速用預期輸出量估算：上限只是天花板，拿來配速會讓每次請求都等滿一分鐘
+            planned = estimated + min(cap, budget.max_completion_tokens)
             groq_pacer.before(model, planned, on_status=on_status)
     elif max_completion_tokens is not None:
         request["max_completion_tokens"] = max_completion_tokens
@@ -204,6 +210,9 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
         finish = choices[0].get("finish_reason") if choices else None
         raise EmptyResponseError(messages.t("provider.empty_response", vendor=vendor.label,
                                             reason=f"finish_reason={finish}"))
+    if choices[0].get("finish_reason") == "length":
+        raise TruncatedOutputError(messages.t("provider.truncated", vendor=vendor.label),
+                                   partial=text, label=f"{vendor.label}/{model}")
     return text
 
 

@@ -21,6 +21,7 @@ from app.agents import cli as agent_cli
 from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import router as llm_router
+from app.llm.base import TruncatedOutputError
 from app.models.schemas import ImplementRequest, RevealRequest
 from app.llm import gemini
 from app.prompts.implement import (FILE_BEGIN, FILE_END, TRACKS, resolve_track,
@@ -286,6 +287,13 @@ def implement(req: ImplementRequest) -> StreamingResponse:
                         max_output_tokens=_GEMINI_MAX_OUT)
                 else:
                     raw, model_used = llm_router.generate(api_provider, task, "")
+            except TruncatedOutputError as e:
+                # 半份檔案不能當成成品落檔；保留原文讓使用者自己判斷
+                (workdir / "api-raw.txt").write_text(e.partial, encoding="utf-8")
+                yield line({"type": "fatal",
+                            "error": messages.t("implement.api_failed", label=label, error=e),
+                            "workdir": str(workdir)})
+                return
             except Exception as e:  # noqa: BLE001
                 yield line({"type": "fatal",
                             "error": messages.t("implement.api_failed", label=label, error=e),

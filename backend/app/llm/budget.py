@@ -31,6 +31,7 @@ GROQ_LOW_TPM_MODELS = frozenset({
 _DEFAULT_GROQ_TPM = 6000  # unknown models: conservative until headers arrive
 _GROQ_COMPLETION_CAP = 1400
 _GROQ_CHUNK_CHARS = 1800
+MIN_GROQ_OUTPUT = 350  # 留給輸出的額度低於這個數字就不值得送出
 
 
 def _groq_start_tpm(model: str) -> int:
@@ -61,6 +62,18 @@ def estimate_tokens(messages: list[dict]) -> int:
         cjk = sum(1 for ch in content if ord(ch) >= 0x2E80)
         total += cjk + math.ceil((len(content) - cjk) / 3) + 12
     return total
+
+
+def trim_to_tokens(text: str, max_tokens: int) -> str:
+    """從頭保留文字直到估算 token 數達到 max_tokens，並盡量切在行尾（逐字稿一行一個時間戳）。"""
+    used = 0.0
+    for index, ch in enumerate(text):
+        used += 1 if ord(ch) >= 0x2E80 else 1 / 3
+        if used > max_tokens:
+            head = text[:index]
+            newline = head.rfind("\n")
+            return head[:newline] if newline > 0 else head
+    return text
 
 
 def _seconds(value: str | None) -> float | None:

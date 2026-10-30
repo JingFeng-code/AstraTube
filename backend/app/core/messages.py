@@ -355,6 +355,22 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "Gemini 影片呼叫失敗",
         "en": "The Gemini video call failed",
     },
+    "provider.truncated": {
+        "zh-Hant": "{vendor} 的回覆超過輸出上限，內容被截斷。可以縮短內容或改用額度較高的模型。",
+        "en": "{vendor} hit its output limit and the reply was cut off. Shorten the content or use a model with a higher limit.",
+    },
+    "ask.answer_truncated": {
+        "zh-Hant": "（這則回答超過模型的輸出上限，後面的內容被截斷了。）",
+        "en": "(This answer hit the model's output limit, so the end was cut off.)",
+    },
+    "ask.transcript_trimmed": {
+        "zh-Hant": "（這個模型的額度放不下整份逐字稿，這則回答只參考了影片前段。）",
+        "en": "(This model's limit could not fit the whole transcript, so this answer only uses the first part of the video.)",
+    },
+    "summarize.deepdive_truncated": {
+        "zh-Hant": "（這份解析超過模型的輸出上限，後面的內容被截斷了。）",
+        "en": "(This deep dive hit the model's output limit, so the end was cut off.)",
+    },
     "llm.no_provider": {
         "zh-Hant": "尚未選擇可用的 AI，請先到 AI 設定連接 Ollama 或選擇雲端供應商。",
         "en": "No usable AI is selected. Open AI settings to connect Ollama or choose a cloud provider.",

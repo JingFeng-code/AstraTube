@@ -8,7 +8,8 @@ from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm import router as llm_router
-from app.llm.base import NotConfiguredError, RefusalError
+from app.llm.base import NotConfiguredError, RefusalError, TruncatedOutputError
+from app.llm.budget import estimate_tokens, summary_budget, trim_to_tokens
 from app.models.schemas import AskRequest
 from app.prompts.ask import ask_system
 from app.transcript import cache, captions, bilibili, imported_subtitles
@@ -17,6 +18,7 @@ router = APIRouter(tags=["ask"])
 
 # 逐字稿太長時只取尾端截斷前的部分，避免撐爆 context（約可容納一小時以上影片）
 _MAX_TRANSCRIPT_CHARS = 60_000
+_TRIM_NOTE = "\n（逐字稿過長，以上為截斷後的前段）"
 
 
 def _load_transcript(video_id: Optional[str]) -> Optional[str]:
@@ -63,6 +65,23 @@ def _answer_with(kind: str, model: str, chat: list[dict], system: str) -> tuple[
     return opencode.generate_messages(chat, system, model=model, tries=2)
 
 
+def _fit_budget(provider: Optional[str], transcript: str, chat: list[dict],
+                language: str) -> tuple[str, bool]:
+    """低額度供應商放不下整份逐字稿時只留前段，回傳 (逐字稿, 是否裁切)。
+
+    留下一次回答的輸出額度；連對話本身都放不下時交給供應商層回報請求過大。
+    """
+    profile = summary_budget(provider)
+    if not profile:
+        return transcript, False
+    overhead = estimate_tokens(chat + [{"content": ask_system("", False, language)}])
+    room = profile.tokens_per_minute - overhead - profile.max_completion_tokens - len(_TRIM_NOTE)
+    trimmed = trim_to_tokens(transcript, max(room, 0))
+    if trimmed == transcript:
+        return transcript, False
+    return trimmed + _TRIM_NOTE, True
+
+
 @router.post("/ask")
 def ask(req: AskRequest) -> dict:
     """回傳 {"answer", "model_used", "searched"}。
@@ -76,7 +95,7 @@ def ask(req: AskRequest) -> dict:
     if not transcript:
         raise HTTPException(400, messages.t("ask.no_transcript"))
     if len(transcript) > _MAX_TRANSCRIPT_CHARS:
-        transcript = transcript[:_MAX_TRANSCRIPT_CHARS] + "\n（逐字稿過長，以上為截斷後的前段）"
+        transcript = transcript[:_MAX_TRANSCRIPT_CHARS] + _TRIM_NOTE
 
     language = config.get("OUTPUT_LANGUAGE")
     # 不可命名為 messages：會遮蔽上方匯入的 app.core.messages，讓錯誤處理本身再出錯
@@ -103,7 +122,13 @@ def ask(req: AskRequest) -> dict:
                 raise HTTPException(500, messages.t("ask.failed", error=e))
             print(f"[ask] Gemini 失敗，改試其他供應商：{e}", flush=True)
 
+    transcript, trimmed = _fit_budget(req.provider, transcript, chat, language)
     system = ask_system(transcript, False, language)
+
+    def reply(text: str, label: str, *notes: str) -> dict:
+        notes = notes + ((messages.t("ask.transcript_trimmed"),) if trimmed else ())
+        answer = "\n\n".join((to_traditional(text, language), *notes))
+        return {"answer": answer, "model_used": label, "searched": False}
 
     # 嚴格模式只試指定的那一個；自動模式先試已設定金鑰的付費供應商，再退回免費接力；
     # free（一般模式）只在免費模型之間接力
@@ -117,9 +142,11 @@ def ask(req: AskRequest) -> dict:
     for k, m in chain:
         try:
             text, label = _answer_with(k, m, chat, system)
-            return {"answer": to_traditional(text, language), "model_used": label, "searched": False}
+            return reply(text, label)
         except RefusalError as e:
             raise HTTPException(400, str(e))
+        except TruncatedOutputError as e:
+            return reply(e.partial, e.label, messages.t("ask.answer_truncated"))
         except Exception as e:  # noqa: BLE001
             last = e
             print(f"[ask] {k}/{m} 失敗，換下一個…：{e}", flush=True)
