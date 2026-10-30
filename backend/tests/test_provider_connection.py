@@ -88,6 +88,70 @@ def test_ask_uses_selected_gemini_model_but_preserves_legacy_auto():
         assert mocked.call_args.kwargs["model"] == "gemini-custom"
 
 
+
+def test_new_cloud_providers_support_verification_generation_and_subtitles():
+    from app.llm import openai_compat
+    names = ("openrouter", "groq", "mistral", "together")
+    for provider in names:
+        assert provider in openai_compat.VENDORS
+        vendor = openai_compat.VENDORS[provider]
+        assert vendor.base_url.startswith("https://")
+        assert llm_router.parse(f"{provider}:vendor/model:free") == (
+            provider, "vendor/model:free")
+        assert subtitle_translation.resolve_provider(f"{provider}:vendor/model:free") == (
+            provider, "vendor/model:free", f"{provider}:vendor/model:free")
+        with patch.object(pc, "_http_models", return_value=["vendor/model:free"]) as mocked:
+            response = pc.check_provider(pc.CheckProviderRequest(provider=provider, api_key="test-key"))
+            assert response["models"] == ["vendor/model:free"]
+            mocked.assert_called_once_with(provider, "test-key")
+        with patch.object(openai_compat, "generate", return_value=("ok", "model")) as generate:
+            llm_router.generate(f"{provider}:vendor/model:free", "hello")
+            assert generate.call_args.args[0].key == provider
+            assert generate.call_args.kwargs["model"] == "vendor/model:free"
+
+
+def test_openrouter_verifies_key_before_public_model_list():
+    # /models 為公開 API，不能只看它的 HTTP 200 就將錯誤金鑰標成已連線。
+    key_bad = httpx.Response(401, json={"error": "invalid"})
+    models_ok = httpx.Response(200, json={"data": [{"id": "openai/model"}]})
+    with patch.object(pc.httpx, "Client") as mock_client:
+        get = mock_client.return_value.__enter__.return_value.get
+        get.side_effect = [key_bad, models_ok]
+        try:
+            pc._http_models("openrouter", "invalid")
+            assert False, "OpenRouter 401 must stop before listing models"
+        except HTTPException as exc:
+            assert exc.status_code == 401
+        assert get.call_count == 1
+
+    with patch.object(pc.httpx, "Client") as mock_client:
+        get = mock_client.return_value.__enter__.return_value.get
+        get.side_effect = [httpx.Response(200, json={"data": {}}), models_ok]
+        names = pc._http_models("openrouter", "valid")
+        assert names == ["openai/model"]
+        assert "/key" in get.call_args_list[0].args[0]
+        assert "/models" in get.call_args_list[1].args[0]
+
+
+def test_model_list_filters_non_chat_entries_and_no_free_provider_advertised():
+    assert pc._models_from_rows([
+        {"id": "whisper-large-v3"}, {"id": "llama-guard-3"}, {"id": "llama-3-instruct"},
+    ], provider="groq") == ["llama-3-instruct"]
+    assert pc._models_from_rows([
+        {"id": "mistral-embed", "capabilities": {"completion_chat": False}},
+        {"id": "mistral-chat", "capabilities": {"completion_chat": True}},
+        {"id": "mistral-no-capabilities", "capabilities": None},
+    ], provider="mistral") == ["mistral-chat", "mistral-no-capabilities"]
+    from app.api import models as model_api
+    with patch.object(model_api.ollama, "connection_status", return_value={
+            "connected": False, "models": []}), patch.object(
+            model_api.gemini, "key_count", return_value=0):
+        response = model_api.list_models()
+    assert "opencode" not in response["providers"]
+    for name in ("openrouter", "groq", "mistral", "together"):
+        assert response["providers"][name]["models"] == []
+
+
 if __name__ == "__main__":
     test_provider_check_uses_supplied_key_without_persisting()
     test_existing_key_can_be_verified_without_exposing_it()
@@ -95,4 +159,7 @@ if __name__ == "__main__":
     test_ollama_only_returns_installed_models()
     test_gemini_selected_model_reaches_router_and_translation()
     test_ask_uses_selected_gemini_model_but_preserves_legacy_auto()
+    test_new_cloud_providers_support_verification_generation_and_subtitles()
+    test_openrouter_verifies_key_before_public_model_list()
+    test_model_list_filters_non_chat_entries_and_no_free_provider_advertised()
     print("AI provider connection tests passed")
