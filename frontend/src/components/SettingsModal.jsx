@@ -95,7 +95,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
     if (KEY_FIELDS[engine] && keys[KEY_FIELDS[engine]]?.trim()) return
     checkProvider(engine, '', ollamaUrl)
     return () => { ++checkVersion.current }
-  }, [engine])
+  }, [engine, state])
 
   async function handleSave() {
     if (saving || checking) return
