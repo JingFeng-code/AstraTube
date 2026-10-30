@@ -87,7 +87,8 @@ def ask(req: AskRequest) -> dict:
 
     if use_gemini:
         try:
-            text, label = gemini.generate_chat(chat, ask_system(transcript, True, language), model=model)
+            text, label = gemini.generate_chat(chat, ask_system(transcript, True, language),
+                                               model=model if kind == llm_router.GEMINI else gemini.MODEL)
             # 有掛搜尋工具時 generate_chat 會在標籤後加後綴；後綴文字隨介面語言變，
             # 所以比對「標籤有沒有被加料」而不是比對某個語言的字面值
             return {"answer": to_traditional(text, language), "model_used": label,
