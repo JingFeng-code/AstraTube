@@ -1,5 +1,7 @@
 # AstraTube 開發路線
 
+> 以下保留各階段當時的紀錄。後續版本已移除開發者模式與 OpenCode 免費模型選項，目前做法請見 [AI 供應商設定](AI_PROVIDER_SETUP.zh-TW.md)。
+
 ## Phase 0：開源基底與開發環境
 
 - [x] 保留 MIT 授權與來源紀錄
@@ -64,7 +66,7 @@
 - [x] 本地併發限制 1、連線錯誤提示、回環網域與埠檢查
 - [x] Mock Ollama API 回歸測試
 - [ ] Windows / WSL 真實本地 Ollama 端到端驗收
-- [ ] 後續支援雙語字幕使用本地模型翻譯（目前仍使用第三方免費模型）
+- [x] 雙語字幕使用本地模型翻譯（見 Phase 2c）
 
 
 ## Phase 2c：本地 Ollama 字幕翻譯（Issue #3 第二切片）

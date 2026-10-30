@@ -11,7 +11,7 @@ labels: bug
 
 **Setup**
 - OS:
-- Engine / model used (e.g. `opencode:deepseek-v4-flash-free`, `anthropic:claude-opus-5`):
+- Engine / model used (e.g. `ollama:qwen3:4b`, `anthropic:claude-opus-5`):
 - "Read screen" enabled? yes / no
 - Source URL (if it is a public video):
 
