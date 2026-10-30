@@ -78,8 +78,8 @@ def test_ask_uses_selected_gemini_model_but_preserves_legacy_auto():
     from app.llm import gemini
     from app.models.schemas import AskRequest
 
-    with patch.object(ask_api, "_load_transcript", return_value="[0] sample"), \\
-         patch.object(gemini, "key_count", return_value=1), \\
+    with patch.object(ask_api, "_load_transcript", return_value="[0] sample"), \
+         patch.object(gemini, "key_count", return_value=1), \
          patch.object(gemini, "generate_chat", return_value=("ok", gemini.MODEL)) as mocked:
         ask_api.ask(AskRequest(question="What?", video_id="dQw4w9WgXcQ", provider=None))
         assert mocked.call_args.kwargs["model"] == gemini.MODEL
