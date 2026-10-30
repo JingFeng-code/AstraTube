@@ -18,8 +18,9 @@ from google import genai
 from google.genai import types
 
 from app.core import config, messages
-from app.llm.base import KeyExhaustedError, NotConfiguredError
-from app.llm.util import is_transient
+from app.llm.base import (EmptyResponseError, KeyExhaustedError, NotConfiguredError,
+                          TruncatedOutputError)
+from app.llm.util import is_transient, safe_finish_reason
 
 MODEL = "gemini-flash-lite-latest"          # 卡片、轉錄、問答
 MODEL_HEAVY = "gemini-flash-latest"         # 實作產出
@@ -72,6 +73,26 @@ def _require_keys() -> list[str]:
     return keys
 
 
+def _text_of(resp, model: str) -> str:
+    """取回應文字；撞到輸出上限時拋例外，不把半份內容當成完整結果。
+
+    REST 欄位是 finishReason，SDK 轉成 candidates[i].finish_reason（FinishReason 列舉）。
+    """
+    text = resp.text or ""
+    candidates = getattr(resp, "candidates", None) or []
+    reason = getattr(candidates[0], "finish_reason", None) if candidates else None
+    reason = getattr(reason, "value", reason)
+    if reason == "MAX_TOKENS":
+        if not text.strip():
+            # 額度全花在思考上、一個字都沒吐出來：沒有部分內容可留，比照其他供應商當空回應
+            raise EmptyResponseError(messages.t(
+                "provider.empty_response", vendor="Gemini",
+                reason=f"finishReason={safe_finish_reason(reason)}"))
+        raise TruncatedOutputError(messages.t("provider.truncated", vendor="Gemini"),
+                                   partial=text, label=model)
+    return text
+
+
 def _over_keys(run, *, seg: int, label: str, tries: int,
                on_status: Callable[[dict[str, Any]], None] | None = None):
     """依序輪替金鑰執行 run(key)。
@@ -94,6 +115,8 @@ def _over_keys(run, *, seg: int, label: str, tries: int,
                            "attempt": attempt + 1, "tries": tries})
             try:
                 return run(key)
+            except TruncatedOutputError:
+                raise  # 換金鑰或重試都還是會被截斷，也不該再花一次額度
             except Exception as e:  # noqa: BLE001
                 last = e
                 if _is_auth_error(e):
@@ -135,8 +158,8 @@ def generate(prompt: str, system: str = "", seg: int = 0,
         if max_output_tokens else None
 
     def run(key: str) -> str:
-        return _client(key).models.generate_content(
-            model=use, contents=full, config=cfg).text
+        return _text_of(_client(key).models.generate_content(
+            model=use, contents=full, config=cfg), use)
 
     return _over_keys(run, seg=seg, label=f"Gemini/{use}", tries=3,
                       on_status=on_status), use
@@ -168,7 +191,7 @@ def generate_chat(chat_messages: list[dict], system: str = "", seg: int = 0,
         def run(key: str) -> str:
             resp = _client(key).models.generate_content(
                 model=use_model, contents=contents, config=make_config(use_search))
-            return resp.text or ""
+            return _text_of(resp, use_model)
         return _over_keys(run, seg=seg, label=f"Gemini/{use_model}/chat", tries=2)
 
     global _search_down_until
@@ -177,6 +200,10 @@ def generate_chat(chat_messages: list[dict], system: str = "", seg: int = 0,
     if search:
         try:
             return run_with(True), use_model + messages.t("gemini.search_suffix")
+        except TruncatedOutputError as e:
+            # 不退回純對話：那會多花一次額度，還可能丟掉已經查到的內容。標籤要照樣標示有用搜尋
+            e.label = use_model + messages.t("gemini.search_suffix")
+            raise
         except Exception as e:  # noqa: BLE001
             if is_quota_error(e):
                 _search_down_until = time.time() + _SEARCH_COOLDOWN_S
@@ -206,6 +233,7 @@ def generate_video(youtube_url: str, directive: str, *,
 
     start_offset／end_offset 形如 "125s"，用來補跑影片的某個時間範圍。
     額度耗盡或金鑰無效時拋 KeyExhaustedError，讓呼叫端換下一把金鑰接續補跑。
+    這裡刻意不把 MAX_TOKENS 當錯誤：DeepSRT 靠「輸出沒有結束標記」判斷被截斷，再從斷點補跑。
     """
     keys = _require_keys()
     key = keys[key_index % len(keys)]

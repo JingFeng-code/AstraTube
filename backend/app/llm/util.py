@@ -84,10 +84,11 @@ def _status_hint(status: int) -> str:
     return ""
 
 
-# 空回應時可以顯示的結束原因（OpenAI 相容服務與 Anthropic 的標準值）
+# 空回應時可以顯示的結束原因（OpenAI 相容服務、Anthropic 與 Gemini 的標準值）
 _KNOWN_FINISH_REASONS = frozenset({
     "stop", "length", "content_filter", "tool_calls", "function_call",
     "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal",
+    "model_context_window_exceeded", "MAX_TOKENS",
 })
 
 

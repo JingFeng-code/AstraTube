@@ -292,7 +292,8 @@ def implement(req: ImplementRequest) -> StreamingResponse:
                 # 半份檔案不能當成成品落檔；保留原文讓使用者自己判斷
                 (workdir / "api-raw.txt").write_text(e.partial, encoding="utf-8")
                 yield line({"type": "fatal",
-                            "error": messages.t("implement.api_failed", label=label, error=e),
+                            "error": messages.t("implement.api_failed", label=label,
+                                                error=user_error(e, api_provider)),
                             "workdir": str(workdir)})
                 return
             except Exception as e:  # noqa: BLE001

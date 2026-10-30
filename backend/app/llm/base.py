@@ -19,7 +19,8 @@ class RefusalError(RuntimeError):
 
 
 class TruncatedOutputError(ProviderError):
-    """模型回覆超過輸出上限被截斷（finish_reason=length）。重試同一份請求結果相同，所以不算暫時性。
+    """模型回覆超過輸出上限被截斷（各家欄位不同，例如 finish_reason=length、stop_reason=max_tokens）。
+    重試同一份請求結果相同，所以不算暫時性。
 
     預設會失敗，避免把半份內容當成完整結果（例如存進翻譯快取）；
     能接受部分內容的呼叫端可以接住它，改用 partial 並明確告知使用者。
