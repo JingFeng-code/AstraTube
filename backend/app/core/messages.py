@@ -78,8 +78,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Extraction failed: no part produced cards. Try again or switch models.",
     },
     "summarize.model_output_invalid": {
-        "zh-Hant": "模型回應不是有效的知識卡格式（可能只輸出了思考過程、內容被截斷，或模型不支援 JSON 輸出）。請重試，或在開發者模式更換模型。",
-        "en": "The model did not return valid card data (it may have returned only its reasoning, been cut off, or not support JSON output). Try again, or switch models in developer mode.",
+        "zh-Hant": "模型回應不是有效的知識卡格式（可能只輸出了思考過程、內容被截斷，或模型不支援 JSON 輸出）。請重試，或在 AI 來源更換模型。",
+        "en": "The model did not return valid card data (it may have returned only its reasoning, been cut off, or not support JSON output). Try again, or switch models in AI source.",
     },
     "summarize.deepdive_failed": {
         "zh-Hant": "深入解析失敗：{error}",
@@ -300,12 +300,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "{vendor} HTTP {status}: {detail}",
     },
     "provider.hint_auth": {
-        "zh-Hant": "服務拒絕存取：可能需要 API Key、金鑰無效，或目前網路／地區被限制。可在開發者模式改用其他模型或本機 Ollama。",
-        "en": "Access was refused: an API key may be required or invalid, or this network/region is blocked. In developer mode, try another model or local Ollama.",
+        "zh-Hant": "服務拒絕存取：可能需要 API Key、金鑰無效，或目前網路／地區被限制。可在 AI 來源改用其他模型或本機 Ollama。",
+        "en": "Access was refused: an API key may be required or invalid, or this network/region is blocked. In AI source, try another model or local Ollama.",
     },
     "provider.hint_not_found": {
-        "zh-Hant": "模型可能已下架或名稱有誤，請在開發者模式更換模型。",
-        "en": "The model may have been retired or renamed. Pick another model in developer mode.",
+        "zh-Hant": "模型可能已下架或名稱有誤，請在 AI 來源更換模型。",
+        "en": "The model may have been retired or renamed. Pick another model in AI source.",
     },
     "provider.hint_rate_limit": {
         "zh-Hant": "免費額度或請求次數已達上限，請稍等幾分鐘再試，或更換模型。",

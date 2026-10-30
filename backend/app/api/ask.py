@@ -132,7 +132,7 @@ def ask(req: AskRequest) -> dict:
         return {"answer": answer, "model_used": label, "searched": False}
 
     # 嚴格模式只試指定的那一個；自動模式先試已設定金鑰的付費供應商，再退回免費接力；
-    # free（一般模式）只在免費模型之間接力
+    # free（舊版相容）只在免費模型之間接力
     use_free = is_auto or kind == llm_router.FREE
     if is_auto:
         chain = [(k, m) for k, m in llm_router.configured_paid_chain() if k != llm_router.GEMINI]

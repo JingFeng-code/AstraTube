@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual } from '../src/utils/user-mode.js'
 import { initialAiSource, resolveAiSource } from '../src/utils/ai-source.js'
+import { STRINGS } from '../src/i18n/strings.js'
 import { createNoteMarkdown, markdownFilename } from '../src/utils/notes-export.js'
 
 test('讀畫面不沿用開發者模式時期的舊設定，開啟時明確說明影片去向',()=>{
@@ -36,4 +37,13 @@ test('Markdown 匯出不需 Obsidian',()=>{
   assert.match(md,/學習筆記/)
   assert.match(md,/Hello/)
   assert.equal(markdownFilename('非法/路徑:*?'),'非法-路徑---.md')
+})
+
+test('介面文字不再提到已移除的開發者模式與 OpenCode 免費模型',()=>{
+  for(const [lang,table] of Object.entries(STRINGS)){
+    for(const [key,value] of Object.entries(table)){
+      if(typeof value!=='string') continue
+      assert.doesNotMatch(value,/開發者模式|developer mode|OpenCode/i,`${lang}:${key}`)
+    }
+  }
 })

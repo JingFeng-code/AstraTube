@@ -3,7 +3,7 @@
 provider 格式：
   - "auto"                    自動：先免費模型接力，全滅才落到已設定金鑰的付費供應商（必須明確指定）
   - None / "" / 不認得的字串   未選擇 AI：generate() 直接拒絕，絕不當成自動模式去呼叫付費供應商
-  - "free"                   只用免費模型：OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）
+  - "free"                   只用免費模型：OpenCode 免費模型之間接力，絕不改用付費供應商（舊版相容，新介面不會送出）
   - "gemini"                  嚴格：只用 gemini-flash-lite-latest
   - "opencode:<model_id>"     嚴格：只用該 OpenCode 免費模型
   - "deepseek:<model_id>"     嚴格：只用該 DeepSeek 模型

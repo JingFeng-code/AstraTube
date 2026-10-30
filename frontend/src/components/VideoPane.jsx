@@ -151,7 +151,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   useEffect(() => () => { runningRef.current = false }, [])
 
   // 整片翻譯：一次一批（最多 16 句）依序送出，從目前播放位置往後優先。
-  // 一般模式只用免費模型；失敗就停下並顯示原因，按「繼續翻譯」從未完成處接續（已翻譯的有快取）。
+  // 只用使用者選定的 AI；失敗就停下並顯示原因，按「繼續翻譯」從未完成處接續（已翻譯的有快取）。
   async function translateAll() {
     if (runningRef.current || !cuesRef.current.length || !provider) return
     const generation = sourceGeneration.current
