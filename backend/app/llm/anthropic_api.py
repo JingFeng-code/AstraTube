@@ -10,10 +10,12 @@ from typing import Any, Callable, Tuple
 
 from app.core import config, messages
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
-                          RefusalError)
+                          RefusalError, TruncatedOutputError)
 from app.llm.util import connect_error, http_error, safe_finish_reason, with_retry
 
 LABEL = "Claude"
+# 官方文件要求這兩種都視為截斷：前者撞到 max_tokens，後者是輸入加輸出塞滿了模型的 context window
+_TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded"})
 CONSOLE_URL = "https://console.anthropic.com/settings/keys"
 
 DEFAULT_MODEL = "claude-opus-5"
@@ -116,6 +118,9 @@ def _once(model: str, chat_messages: list[dict], system: str) -> str:
         raise EmptyResponseError(messages.t(
             "provider.empty_response", vendor=LABEL,
             reason=f"stop_reason={safe_finish_reason(getattr(resp, 'stop_reason', None))}"))
+    if getattr(resp, "stop_reason", None) in _TRUNCATED_STOP_REASONS:
+        raise TruncatedOutputError(messages.t("provider.truncated", vendor=LABEL),
+                                   partial=text, label=f"{LABEL}/{model}")
     return text
 
 

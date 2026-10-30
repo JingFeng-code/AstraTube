@@ -35,6 +35,7 @@ jobs:
           python tests/test_explicit_provider.py
           python tests/test_provider_connection.py
           python tests/test_groq_budget.py
+          python tests/test_truncated_output.py
           python tests/test_public_errors.py
           python tests/test_opencode_errors.py
           python tests/test_free_relay.py

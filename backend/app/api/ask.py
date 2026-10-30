@@ -118,6 +118,10 @@ def ask(req: AskRequest) -> dict:
                     "searched": label != gemini_model}
         except NotConfiguredError as e:
             raise HTTPException(400, str(e))
+        except TruncatedOutputError as e:
+            answer = "\n\n".join((to_traditional(e.partial, language),
+                                  messages.t("ask.answer_truncated")))
+            return {"answer": answer, "model_used": e.label, "searched": e.label != gemini_model}
         except Exception as e:  # noqa: BLE001
             if kind == llm_router.GEMINI:
                 raise HTTPException(500, messages.t("ask.failed", error=user_error(e, req.provider)))

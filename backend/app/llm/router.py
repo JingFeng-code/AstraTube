@@ -14,7 +14,7 @@ from typing import Any, Callable, Optional, Tuple
 
 from app.core import messages
 from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
-from app.llm.base import NotConfiguredError, RefusalError
+from app.llm.base import NotConfiguredError, RefusalError, TruncatedOutputError
 
 AUTO = "auto"
 FREE = "free"
@@ -144,6 +144,8 @@ def generate(provider: Optional[str], prompt: str, system: str = "", seg: int = 
             return _call(kind_p, model_p, prompt, system, seg, on_status)
         except RefusalError:
             raise  # 內容被婉拒，換供應商也是同一份 prompt，直接讓使用者知道
+        except TruncatedOutputError:
+            raise  # 已有部分內容，交給呼叫端處理；不要為此再花另一家付費供應商的額度
         except Exception as e:  # noqa: BLE001
             last = e
             print(f"[LLM] {kind_p}/{model_p} 失敗，換下一個供應商…：{e}", flush=True)

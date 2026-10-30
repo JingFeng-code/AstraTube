@@ -43,6 +43,31 @@
 - 內建 llama.cpp 模型一鍵下載與本地語音轉字幕。
 - 不同供應商模型的價格、權限、支援功能及 context 限制之完整同步。
 
+## 回覆被截斷時
+
+模型的回覆撞到輸出上限時，AstraTube 會明確告知，不會把半份內容當成完整結果：
+
+- **摘要**：保留已產生的卡片，並提示該段可能不完整。
+- **問答與深入解析**：顯示已產生的內容，並註明被截斷。
+- **翻譯與實作**：視為失敗，不寫入翻譯快取，也不落檔成品。
+
+截斷不會重試，也不會自動改用其他供應商，因為同一份請求結果相同，換一家只會多花額度。
+
+目前會偵測截斷的供應商與判斷依據：
+
+| 供應商 | 判斷依據 |
+| --- | --- |
+| OpenAI、DeepSeek、OpenRouter、Groq、Mistral、Together | `finish_reason` 為 `length` |
+| Anthropic（Claude） | `stop_reason` 為 `max_tokens` 或 `model_context_window_exceeded` |
+| Gemini | `finishReason` 為 `MAX_TOKENS` |
+| 本機 Ollama | 串流最後一筆的 `done_reason` 為 `length` |
+
+限制：
+
+- OpenCode 免費模型目前**尚未**偵測截斷，被截斷時可能不會出現上述提示。
+- Gemini 影片轉錄（DeepSRT）不走這套處理，而是偵測到輸出中斷後從斷點補跑。
+- 以上行為只經過模擬回應的自動化測試，尚未用真實金鑰或本機模型實測。
+
 ## Groq 低額度模型的自動節流（測試版）
 
 影片分析會先根據使用者選定的 Groq 模型套用保守的「Token 預算」，目前以 `qwen/qwen3.8-27b` 等官方公布 8,000 TPM 的模型為主要測試對象：
@@ -51,7 +76,7 @@
 - 每次 Groq Chat Completion 指定 **`max_completion_tokens=1400`**（模型可能提前停止）；用精簡但保有時間戳、原文節錄的學習卡片格式。
 - Qwen 3.8 27B 使用 `reasoning_effort=none`；不把有限輸出 Token 消耗在長推理。Groq GPT-OSS 20B／120B 則採用 `low`。
 - `1400` 的輸出上限只用於影片摘要；問答、深入解析、翻譯與實作會用這一分鐘剩下的額度。問答遇到放不下的長逐字稿時只參考影片前段，並在回答後註明。
-- 任何雲端模型的回覆超過輸出上限時都會明確告知：摘要保留已產生的卡片並提示該段可能不完整，問答與深入解析顯示已產生的內容並註明被截斷，翻譯與實作視為失敗（不寫入翻譯快取，也不落檔成品）。
+- 回覆超過輸出上限的處理方式，請見下方「回覆被截斷時」。
 - **僅一個 Groq 生成工作者**；依預估輸入／輸出 Token 控制請求間隔，並優先參考 Groq 回應標頭 `x-ratelimit-limit-tokens`、`x-ratelimit-remaining-tokens`、`x-ratelimit-reset-tokens`。
 - 若模型回傳實際 TPM 與預設不同，後續影片分析會將分段大小及輸出上限跟著調整。暫存資訊只存在本次執行的記憶體，重啟後重新觀察。
 - 遇到暫時性 HTTP 429 時依供應商 `retry-after` 延後重試；若明確指出「Request too large」，停止無效的重試並顯示適當提示，不隱藏切換供應商。
