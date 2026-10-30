@@ -49,6 +49,8 @@ def parse(provider: Optional[str]) -> Tuple[str, str]:
 
 
 def _default_model(kind: str) -> str:
+    if kind == GEMINI:
+        return gemini.MODEL
     if kind == OLLAMA:
         return ollama.default_model()
     if kind == ANTHROPIC:
