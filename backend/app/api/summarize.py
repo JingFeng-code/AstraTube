@@ -15,7 +15,7 @@ from app.core.zh import to_traditional
 from app.llm import router as llm_router
 from app.llm.base import TruncatedOutputError
 from app.llm.budget import summary_budget
-from app.llm.util import public_reason
+from app.llm.util import user_error
 from app.models.schemas import DeepDiveRequest, SummarizeRequest
 from app.prompts.summarize import (deepdive_prompt, deepdive_system,
                                    summarize_prompt, summarize_system,
@@ -361,8 +361,7 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 return
             except Exception as e:  # noqa: BLE001
                 failed += 1
-                yield line({"type": "seg_error", "seg": i,
-                            "error": public_reason(e) or str(e)[:200]})
+                yield line({"type": "seg_error", "seg": i, "error": user_error(e, req.provider)})
                 return
             if title is None and data.get("title"):
                 title = data.get("title")
@@ -417,4 +416,5 @@ def deepdive(req: DeepDiveRequest) -> dict:
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, messages.t("summarize.deepdive_failed", error=e))
+        raise HTTPException(500, messages.t("summarize.deepdive_failed",
+                                            error=user_error(e, req.provider)))

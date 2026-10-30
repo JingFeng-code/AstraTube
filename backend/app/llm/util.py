@@ -92,6 +92,38 @@ def public_reason(error: Exception) -> str:
     return getattr(error, "public_message", "") or ""
 
 
+def user_error(error: Exception | None, provider: str | None = None) -> str:
+    """給瀏覽器看的錯誤文字。絕不回傳上游回應內容：它可能回顯金鑰或送出去的字幕。
+
+    例外本身的 str() 只有確定由我們自己產生時才能用；其餘只說狀態碼或通用說明，
+    完整內容留在後端紀錄。Ollama 的錯誤訊息全由本機程式產生，可以直接顯示。
+    """
+    from app.llm.base import NotConfiguredError, ProviderError, RefusalError
+    if error is None:
+        return messages.t("provider.failed_generic")
+    public = public_reason(error)
+    if public:
+        return public
+    if isinstance(error, (ValueError, NotConfiguredError, RefusalError)):
+        return str(error)
+    if (provider or "").startswith("ollama:") and isinstance(error, ProviderError):
+        return str(error)
+    code = getattr(error, "code", None) or getattr(error, "status_code", None)
+    try:
+        status = int(code)
+    except (TypeError, ValueError):
+        return messages.t("provider.failed_generic")
+    return f"HTTP {status} {_status_hint(status)}".strip()
+
+
+def response_error(vendor: str, message: str) -> "ProviderError":
+    """上游回了無法使用的內容：message 可含內容摘要供後端紀錄，公開訊息只說明狀況。"""
+    from app.llm.base import ProviderError
+    error = ProviderError(message)
+    error.public_message = messages.t("provider.bad_response", vendor=vendor)
+    return error
+
+
 def http_error(vendor: str, status: int, body: str) -> "ProviderError":
     """建立 HTTP 錯誤：完整訊息（含回應摘要）供後端紀錄與重試判斷，公開訊息只含狀態碼與建議。"""
     from app.llm.base import ProviderError

@@ -13,7 +13,7 @@ from app.core import config, messages
 from app.llm.budget import MIN_GROQ_OUTPUT, groq_pacer, summary_budget, estimate_tokens
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           ProviderError, TruncatedOutputError)
-from app.llm.util import connect_error, http_error, with_retry
+from app.llm.util import connect_error, http_error, response_error, with_retry
 
 # 推理型模型（deepseek-reasoner、gpt-5 thinking 等）單次摘要可能跑數分鐘，讀取逾時要給足
 _CHAT_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=60.0, pool=15.0)
@@ -186,19 +186,20 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
                                       "請縮短片段或選擇更高額度的模型。")
             else:
                 err.retry_after = groq_pacer.retry_delay(model, resp.headers)
-                err.public_message = ("Groq 暫時達到速率限制，正在依照服務商回傳的"
-                                      "重試時間等待。")
+                # 這是重試用盡後才會顯示的訊息；等待中的狀態由 retry_wait 事件顯示
+                err.public_message = ("Groq 達到速率限制，依服務商回傳的時間重試後仍未成功。"
+                                      "請稍後再試或更換較高額度的模型。")
         raise err
     try:
         data = resp.json()
     except Exception:
-        raise ProviderError(messages.t("provider.not_json", vendor=vendor.label,
-                                       detail=resp.text[:200]))
+        raise response_error(vendor.label, messages.t("provider.not_json", vendor=vendor.label,
+                                                      detail=resp.text[:200]))
 
     if isinstance(data, dict) and data.get("error"):
         err = data["error"]
         msg = err.get("message") if isinstance(err, dict) else str(err)
-        raise ProviderError(messages.t("provider.error", vendor=vendor.label, detail=msg))
+        raise response_error(vendor.label, messages.t("provider.error", vendor=vendor.label, detail=msg))
 
     choices = (data or {}).get("choices") or []
     msg = (choices[0].get("message", {}) or {}) if choices else {}
