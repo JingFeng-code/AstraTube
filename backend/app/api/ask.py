@@ -70,6 +70,8 @@ def ask(req: AskRequest) -> dict:
     auto 模式與摘要相反：有 Gemini 金鑰就優先（有搜尋工具，能查影片外的資料），
     沒有才依序試其他已設定的供應商，最後才是 OpenCode 免費模型接力。
     """
+    if not llm_router.is_explicit(req.provider):
+        raise HTTPException(400, messages.t("llm.no_provider"))
     transcript = _load_transcript(req.video_id)
     if not transcript:
         raise HTTPException(400, messages.t("ask.no_transcript"))

@@ -1,8 +1,9 @@
 """文字生成的供應商路由：解析 provider 字串並決定要不要跨供應商備援。
 
 provider 格式：
-  - None / "" / "auto"        自動：先免費模型接力，全滅才落到已設定金鑰的付費供應商
-  - "free"                    只用免費模型：OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）
+  - "auto"                    自動：先免費模型接力，全滅才落到已設定金鑰的付費供應商（必須明確指定）
+  - None / "" / 不認得的字串   未選擇 AI：generate() 直接拒絕，絕不當成自動模式去呼叫付費供應商
+  - "free"                   只用免費模型：OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）
   - "gemini"                  嚴格：只用 gemini-flash-lite-latest
   - "opencode:<model_id>"     嚴格：只用該 OpenCode 免費模型
   - "deepseek:<model_id>"     嚴格：只用該 DeepSeek 模型
@@ -11,6 +12,7 @@ provider 格式：
 """
 from typing import Any, Callable, Optional, Tuple
 
+from app.core import messages
 from app.llm import anthropic_api, gemini, opencode, openai_compat, ollama
 from app.llm.base import NotConfiguredError, RefusalError
 
@@ -29,6 +31,18 @@ _PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA, GEMINI,
 
 # 自動模式的首選（免費、不需金鑰）
 DEFAULT_AUTO_MODEL = opencode.DEFAULT_FREE_MODEL
+
+
+def is_explicit(provider: Optional[str]) -> bool:
+    """呼叫端是否明確選了 AI。沒選時不可以自己挑供應商，以免默默用掉使用者的付費金鑰。"""
+    p = (provider or "").strip()
+    return p in (AUTO, FREE, GEMINI) or any(p.startswith(f"{kind}:") for kind in _PREFIXED)
+
+
+def require_explicit(provider: Optional[str]) -> None:
+    """未選擇 AI 時拋 NotConfiguredError（致命錯誤，前端會請使用者到 AI 設定選擇）。"""
+    if not is_explicit(provider):
+        raise NotConfiguredError(messages.t("llm.no_provider"))
 
 
 def parse(provider: Optional[str]) -> Tuple[str, str]:
@@ -96,6 +110,7 @@ def configured_paid_chain() -> list[Tuple[str, str]]:
 def generate(provider: Optional[str], prompt: str, system: str = "", seg: int = 0,
              on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
     """回傳 (文字, 實際產生答案的模型標籤)。seg 是段落索引，用來錯開 Gemini 金鑰。"""
+    require_explicit(provider)
     kind, model = parse(provider)
     chat = [{"role": "user", "content": prompt}]
 

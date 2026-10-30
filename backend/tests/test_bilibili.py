@@ -120,7 +120,7 @@ def test_summary_stream_has_bilibili_metadata():
              {"title": "範例", "cards": [{"heading": "重點", "summary": "內容"}], "content_type": "tutorial"}, "fake-model"
          )), \
          patch.object(api_summarize.llm_router, "parallel_workers", return_value=1):
-        response = api_summarize.summarize_stream(SummarizeRequest(url=f"https://www.bilibili.com/video/{BVID}/?p=2"))
+        response = api_summarize.summarize_stream(SummarizeRequest(url=f"https://www.bilibili.com/video/{BVID}/?p=2", provider="auto"))
         events = asyncio.run(_events(response))
         meta = next(e for e in events if e["type"] == "meta")
         assert meta["youtube_video_id"] is None

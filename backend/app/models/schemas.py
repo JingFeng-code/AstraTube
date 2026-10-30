@@ -19,7 +19,8 @@ class Card(BaseModel):
 
 class SummarizeRequest(BaseModel):
     url: str
-    # provider："auto"／None＝免費模型優先、失敗才備援到有金鑰的付費供應商；
+    # provider：None／空字串／不認得的字串＝尚未選擇 AI，後端會拒絕；
+    #           "auto"＝免費模型優先、失敗才備援到有金鑰的付費供應商（必須明確指定）；
     #           "free"＝只在 OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）；
     #           "gemini"＝只用 gemini-flash-lite-latest；
     #           "opencode:／deepseek:／openai:／anthropic:<model_id>"＝只用該模型
