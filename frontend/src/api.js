@@ -91,6 +91,8 @@ export async function getSettings() {
   catch { return {configured:false,offline:true} }
 }
 export const saveSettings = (payload) => post('/settings', payload)
+// 只檢查指定供應商；暫時輸入的 API Key 不會儲存，成功後才讓使用者選模型。
+export const checkProvider = (payload) => post('/providers/check', payload)
 // 不需先儲存：帶入設定畫面上目前輸入的網址（後端仍只接受本機 11434 埠）
 export const getOllamaStatus = (baseUrl) => get('/ollama/status' + (baseUrl ? '?base_url=' + encodeURIComponent(baseUrl) : ''))
 // 模型下拉選單清單；後端未就緒時回 null，由呼叫端退回靜態清單
