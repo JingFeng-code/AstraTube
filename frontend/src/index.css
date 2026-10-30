@@ -461,3 +461,18 @@ button:disabled{cursor:not-allowed}
 .subtitle-mode button.active{background:var(--accent-soft);color:var(--text);font-weight:650}
 .subtitle-mode button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:600px){.subtitle-overlay{bottom:46px}}
+
+/* 統一 AI 設定：主畫面保留單一 AI 來源入口，進階選項按需展開。 */
+.input-row > .btn-paper{min-height:46px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 13px;border-radius:var(--radius-control);font-size:12.5px;font-weight:650}
+.ai-advanced > summary{display:flex;align-items:center;justify-content:center;min-height:46px;padding:0 12px;border:1px solid var(--border);background:var(--surface);color:var(--text-soft);border-radius:var(--radius-control);font-size:12px;white-space:nowrap;cursor:pointer;list-style:none}
+.ai-advanced > summary::-webkit-details-marker{display:none}
+.ai-advanced[open]{position:relative}
+.ai-advanced[open] .deep-visual-toggle{position:absolute;top:calc(100% + 8px);right:0;z-index:9;min-width:210px;box-shadow:var(--shadow)}
+.settings-advanced{border:1px solid var(--border);border-radius:var(--radius-control);padding:12px;display:flex;flex-direction:column;gap:14px}
+.settings-advanced:not([open]){display:block}
+.settings-advanced > summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--text);list-style:revert}
+.settings-advanced[open] > summary{margin-bottom:14px}
+.deck-advanced{flex-shrink:0;position:relative;font-size:11.5px;color:var(--text-soft)}
+.deck-advanced > summary{cursor:pointer;white-space:nowrap}
+.deck-advanced[open] > .btn-implement{margin-top:6px}
+@media(max-width:1080px){.input-row>.btn-paper{max-width:100%;}}
