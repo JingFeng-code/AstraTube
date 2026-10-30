@@ -101,7 +101,8 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
     if (saving || checking) return
     setErr('')
     const changing = !unchangedSource
-    if (!isSmart && (changing || !!typedKey.trim()) &&
+    const ollamaChanged = engine === 'ollama' && ollamaUrl.trim() !== (state?.ollama_base_url || 'http://127.0.0.1:11434')
+    if (!isSmart && (changing || !!typedKey.trim() || ollamaChanged) &&
         (!verified || !model || !available.includes(model))) {
       setErr(t('ai.verifyBeforeSave'))
       return
