@@ -41,6 +41,8 @@ _ENDPOINTS = {
 _MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$")
 _EXCLUDE = ("embed", "audio", "speech", "transcrib", "whisper", "image", "dall-e",
             "tts", "moderation", "realtime", "search", "rerank")
+_TOGETHER_NON_TEXT = frozenset({"image", "embedding", "rerank", "audio", "transcribe",
+                                "moderation", "video"})
 
 
 class CheckProviderRequest(BaseModel):
@@ -69,6 +71,9 @@ def _models_from_rows(rows: list, *, provider: str = "") -> list[str]:
             output = (item.get("architecture") or {}).get("output_modalities") or ["text"]
             if "text" not in output:
                 continue
+        # Together 用 type 標示模型類別；有標示非文字類別才排除，沒標示的保留。
+        if provider == "together" and item.get("type") in _TOGETHER_NON_TEXT:
+            continue
         if value not in names:
             names.append(value)
     # OpenRouter 的目錄可能超過數百筆，搭配前端搜尋欄而不是在此截斷。
@@ -101,7 +106,8 @@ def _http_models(provider: str, key: str) -> list[str]:
     _require_http_ok(res)
     try:
         data = res.json()
-        rows = data.get("data")
+        # 多數供應商回 {"data": [...]}；Together 的 /v1/models 據回報直接回陣列，兩種都接受。
+        rows = data if isinstance(data, list) else data.get("data")
         if not isinstance(rows, list):
             raise ValueError("unexpected response")
         return _models_from_rows(rows, provider=provider)
