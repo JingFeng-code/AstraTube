@@ -20,7 +20,7 @@ export const STATIC_PROVIDERS = {
 export const PROVIDER_ORDER = ['opencode', 'ollama', 'gemini', 'deepseek', 'openai', 'anthropic']
 
 // Gemini 在後端是「整個供應商只有一個模型」，provider 字串就是 "gemini"（不帶 :model）
-export const providerValue = (kind, model) => (kind === 'gemini' ? 'gemini' : `${kind}:${model}`)
+export const providerValue = (kind, model) => `${kind}:${model}`
 
 function normalize(data) {
   if (!data) return null
