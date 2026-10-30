@@ -152,7 +152,33 @@ def test_model_list_filters_non_chat_entries_and_no_free_provider_advertised():
         assert response["providers"][name]["models"] == []
 
 
+def _models_response(provider, response):
+    with patch.object(pc.httpx, "Client") as client:
+        client.return_value.__enter__.return_value.get.return_value = response
+        return pc._http_models(provider, "valid")
+
+
+def test_model_list_accepts_bare_array_and_data_envelope():
+    rows = [{"id": "meta/llama-chat", "type": "chat"}, {"id": "acme/writer", "type": "language"},
+            {"id": "black/flux", "type": "image"}, {"id": "acme/vector", "type": "embedding"},
+            {"id": "acme/untyped"}]
+    expected = ["meta/llama-chat", "acme/writer", "acme/untyped"]
+    assert _models_response("together", httpx.Response(200, json=rows)) == expected
+    assert _models_response("together", httpx.Response(200, json={"data": rows})) == expected
+
+
+def test_model_list_still_rejects_unrecognized_shapes():
+    for body in ({"data": {}}, {"models": []}, "not a list"):
+        try:
+            _models_response("together", httpx.Response(200, json=body))
+            assert False, f"{body!r} 不可當成模型清單"
+        except HTTPException as exc:
+            assert exc.status_code == 502
+
+
 if __name__ == "__main__":
+    test_model_list_accepts_bare_array_and_data_envelope()
+    test_model_list_still_rejects_unrecognized_shapes()
     test_provider_check_uses_supplied_key_without_persisting()
     test_existing_key_can_be_verified_without_exposing_it()
     test_wrong_key_and_missing_key_do_not_return_static_models()
