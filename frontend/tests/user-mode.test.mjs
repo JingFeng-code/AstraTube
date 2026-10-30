@@ -8,12 +8,13 @@ test('舊一般模式遷移為本機智慧模式，保留舊 Ollama 選擇',()=>
   assert.equal(initialAiSource(null,'free'),'smart')
   assert.equal(initialAiSource('auto','openai:paid'),'smart')
   assert.equal(initialAiSource(null,'ollama:qwen3:14b'),'ollama:qwen3:14b')
+  assert.equal(initialAiSource('opencode:mimo-free',null),'smart')
 })
 test('智慧模式只用本機，不暗中轉雲端；明確選擇才可用雲端',()=>{
   const providers={ollama:{configured:false,models:[]},gemini:{configured:true,models:['x']},opencode:{configured:true,models:['x-free']}}
   assert.equal(resolveAiSource('smart',providers),null)
   assert.equal(resolveAiSource('gemini',providers),'gemini')
-  assert.equal(resolveAiSource('opencode:x-free',providers),'opencode:x-free')
+  assert.equal(resolveAiSource('opencode:x-free',providers),null)
   providers.ollama={configured:true,models:['qwen3:4b','qwen3:14b']}
   assert.equal(resolveAiSource('smart',providers),'ollama:qwen3:4b')
   assert.equal(resolveAiSource('ollama:qwen3:14b',providers),'ollama:qwen3:14b')
