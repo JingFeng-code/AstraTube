@@ -10,6 +10,7 @@ from typing import Any, Callable, Tuple
 import httpx
 
 from app.core import config, messages
+from app.llm.budget import groq_pacer, summary_budget, estimate_tokens
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           ProviderError)
 from app.llm.util import connect_error, http_error, with_retry
@@ -135,20 +136,47 @@ def list_models(vendor: Vendor) -> Tuple[list[str], str]:
     return list(models), source
 
 
-def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict]) -> str:
-    """打一次 /chat/completions，回傳助手訊息內容。"""
+def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
+               max_completion_tokens: int | None = None,
+               on_status: Callable[[dict[str, Any]], None] | None = None) -> str:
+    """打一次 /chat/completions。Groq 按模型額度限制輸出並配速。"""
+    request = {"model": model, "messages": chat_messages}
+    if vendor.key == "groq":
+        budget = summary_budget(f"groq:{model}")
+        if budget:
+            max_completion_tokens = min(max_completion_tokens or budget.max_completion_tokens,
+                                        budget.max_completion_tokens)
+            request["max_completion_tokens"] = max_completion_tokens
+            planned = estimate_tokens(chat_messages) + max_completion_tokens
+            if planned > budget.tokens_per_minute:
+                err = ProviderError("Groq 輸入加輸出預算超過目前的保守每分鐘限額，請縮短內容。")
+                err.public_message = "Groq 單次請求過大；請減少輸入內容或更換較高額度的模型。"
+                raise err
+            groq_pacer.before(model, planned, on_status=on_status)
+    elif max_completion_tokens is not None:
+        request["max_completion_tokens"] = max_completion_tokens
     try:
         resp = httpx.post(
             f"{vendor.base_url}/chat/completions",
-            headers=_headers(vendor),
-            json={"model": model, "messages": chat_messages},
-            timeout=_CHAT_TIMEOUT,
+            headers=_headers(vendor), json=request, timeout=_CHAT_TIMEOUT,
         )
     except httpx.HTTPError as e:
         raise connect_error(vendor.label, e)
 
+    if vendor.key == "groq":
+        groq_pacer.observe(model, resp.headers)
     if resp.status_code >= 400:
-        raise http_error(vendor.label, resp.status_code, resp.text)
+        err = http_error(vendor.label, resp.status_code, resp.text)
+        if vendor.key == "groq" and resp.status_code == 429:
+            if "request too large" in resp.text.lower():
+                err.permanent_rate_limit = True
+                err.public_message = ("Groq 單次請求超過此模型的速率額度。"
+                                      "請縮短片段或選擇更高額度的模型。")
+            else:
+                err.retry_after = groq_pacer.retry_delay(model, resp.headers)
+                err.public_message = ("Groq 暫時達到速率限制，正在依照服務商回傳的"
+                                      "重試時間等待。")
+        raise err
     try:
         data = resp.json()
     except Exception:
@@ -175,7 +203,8 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict]) -> str:
 
 def generate_messages(vendor: Vendor, messages: list[dict], system: str = "",
                       model: str = "", tries: int = 3,
-                      on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
+                      on_status: Callable[[dict[str, Any]], None] | None = None,
+                      max_completion_tokens: int | None = None) -> Tuple[str, str]:
     """多輪對話生成。messages 為 OpenAI 格式的 user/assistant 交錯清單。"""
     model = model or vendor.default_model
     msgs = ([{"role": "system", "content": system}] if system else []) + list(messages)
@@ -184,14 +213,19 @@ def generate_messages(vendor: Vendor, messages: list[dict], system: str = "",
         if on_status:
             on_status({"provider": vendor.key, "model": model, **event})
 
-    text = with_retry(lambda: _post_chat(vendor, model, msgs), tries=tries,
+    text = with_retry(lambda: _post_chat(vendor, model, msgs,
+                                        max_completion_tokens=max_completion_tokens,
+                                        on_status=report), tries=tries,
                       label=f"{vendor.label}/{model}", on_status=report)
     return text, f"{vendor.label}/{model}"
 
 
 def generate(vendor: Vendor, prompt: str, system: str = "", model: str = "",
              tries: int = 3,
-             on_status: Callable[[dict[str, Any]], None] | None = None) -> Tuple[str, str]:
+             on_status: Callable[[dict[str, Any]], None] | None = None,
+             max_completion_tokens: int | None = None) -> Tuple[str, str]:
     """單輪文字生成。回傳 (文字, 模型標籤)。"""
     return generate_messages(vendor, [{"role": "user", "content": prompt}],
-                             system=system, model=model, tries=tries, on_status=on_status)
+                             system=system, model=model, tries=tries,
+                             on_status=on_status,
+                             max_completion_tokens=max_completion_tokens)
