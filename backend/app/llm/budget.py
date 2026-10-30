@@ -28,21 +28,28 @@ class SummaryBudget:
 GROQ_LOW_TPM_MODELS = frozenset({
     "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b",
 })
-_DEFAULT_GROQ_TPM = 8000
+_DEFAULT_GROQ_TPM = 6000  # unknown models: conservative until headers arrive
 _GROQ_COMPLETION_CAP = 1400
 _GROQ_CHUNK_CHARS = 1800
 
 
+def _groq_start_tpm(model: str) -> int:
+    return 8000 if model in GROQ_LOW_TPM_MODELS else _DEFAULT_GROQ_TPM
+
+
 def summary_budget(provider: str | None) -> SummaryBudget | None:
-    """Only opt in strict providers; never silently change other AI backends."""
+    """Initial per-model estimates, adapted to actual TPM once headers are observed."""
     if not provider or not provider.startswith("groq:"):
         return None
     model = provider.removeprefix("groq:").strip()
     if not model:
         return None
+    tpm = groq_pacer.limit_for(model)
+    ratio = min(1.0, tpm / 8000)
     return SummaryBudget(
-        chunk_chars=_GROQ_CHUNK_CHARS, max_completion_tokens=_GROQ_COMPLETION_CAP,
-        tokens_per_minute=_DEFAULT_GROQ_TPM,
+        chunk_chars=max(500, int(_GROQ_CHUNK_CHARS * ratio)),
+        max_completion_tokens=max(350, int(_GROQ_COMPLETION_CAP * ratio)),
+        tokens_per_minute=tpm,
     )
 
 
@@ -83,12 +90,17 @@ class GroqPacer:
         self._lock = threading.Lock()
         self._states: dict[str, dict] = {}
 
+    def limit_for(self, model: str) -> int:
+        with self._lock:
+            state = self._states.get(model)
+            return state["tpm"] if state else _groq_start_tpm(model)
+
     def before(self, model: str, estimated: int, *,
                on_status: Callable[[dict], None] | None = None) -> None:
         # Serialized per model, preventing free-tier parallel bursts.
         with self._lock:
             state = self._states.setdefault(model, {
-                "next_at": 0.0, "tpm": _DEFAULT_GROQ_TPM,
+                "next_at": 0.0, "tpm": _groq_start_tpm(model),
                 "remaining": None, "reset_at": 0.0,
             })
             now = time.monotonic()
@@ -113,7 +125,7 @@ class GroqPacer:
     def observe(self, model: str, headers: Mapping[str, str]) -> None:
         with self._lock:
             state = self._states.setdefault(model, {
-                "next_at": 0.0, "tpm": _DEFAULT_GROQ_TPM,
+                "next_at": 0.0, "tpm": _groq_start_tpm(model),
                 "remaining": None, "reset_at": 0.0,
             })
             limit = headers.get("x-ratelimit-limit-tokens")
@@ -135,7 +147,7 @@ class GroqPacer:
         delay = min(120.0, delay + 1.0)
         with self._lock:
             state = self._states.setdefault(model, {
-                "next_at": 0.0, "tpm": _DEFAULT_GROQ_TPM,
+                "next_at": 0.0, "tpm": _groq_start_tpm(model),
                 "remaining": None, "reset_at": 0.0,
             })
             state["next_at"] = max(state["next_at"], time.monotonic() + delay)
