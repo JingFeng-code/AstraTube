@@ -2,7 +2,7 @@ import { useState } from 'react'
 import * as api from '../api.js'
 
 // 串流生成重點：封裝 NDJSON 事件解析、樂觀顯示與生成進度追蹤。
-export default function useSummarizeStream({ initialResult = null, onSegError, t } = {}) {
+export default function useSummarizeStream({ initialResult = null, onSegError, onSegTruncated, t } = {}) {
   const [result, setResult] = useState(initialResult)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -32,6 +32,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
         } else if (ev.type === 'title') {
           draft.title = ev.title
         } else if (ev.type === 'cards') {
+          if (ev.truncated) onSegTruncated?.(ev)
           segsDone++
           draft.cards = [...draft.cards, ...(ev.cards || [])]
           // 先採用第一個非 other 的段落判定（開場段常判 other），done 事件再用多數決校正

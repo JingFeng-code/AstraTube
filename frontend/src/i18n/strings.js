@@ -301,6 +301,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `Appended to: ${p}`,
     'toast.saveFailed': (m) => `Save failed: ${m}`,
     'toast.deepdiveFailed': (m) => `Deep dive failed: ${m}`,
+    'toast.segTruncated': (n) => `Part ${n} hit the model's output limit, so its cards may be incomplete`,
     'toast.segFailed': (n, reason) => `Part ${n} failed and was skipped${reason ? `: ${reason}` : ''}`,
 
     'error.generate': (m) => `Extraction failed: ${m}`,
@@ -615,6 +616,7 @@ export const STRINGS = {
     'toast.appendedTo': (p) => `已附加到：${p}`,
     'toast.saveFailed': (m) => `存檔失敗：${m}`,
     'toast.deepdiveFailed': (m) => `深入解析失敗：${m}`,
+    'toast.segTruncated': (n) => `第 ${n} 段超過模型的輸出上限，這段的卡片可能不完整`,
     'toast.segFailed': (n, reason) => `第 ${n} 段生成失敗，已跳過${reason ? `：${reason}` : ''}`,
 
     'error.generate': (m) => `整理失敗：${m}`,

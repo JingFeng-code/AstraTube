@@ -17,9 +17,11 @@ _TRANSIENT_HINTS = (
 
 def is_transient(e: Exception) -> bool:
     """判斷是否為暫時性錯誤（值得重試／換金鑰／換供應商）。"""
-    from app.llm.base import EmptyResponseError
+    from app.llm.base import EmptyResponseError, TruncatedOutputError
     if isinstance(e, EmptyResponseError):
         return True  # 空回應重試通常就好，不該當成永久失敗直接放棄整段
+    if isinstance(e, TruncatedOutputError):
+        return False  # 同一份請求重試還是會被截斷
     if getattr(e, "model_unavailable", False) or getattr(e, "permanent_rate_limit", False):
         return False  # 模型下架／暫停：重試同一個模型沒用，直接換下一個
     code = getattr(e, "code", None) or getattr(e, "status_code", None)

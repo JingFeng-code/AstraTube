@@ -13,6 +13,7 @@ from json_repair import repair_json
 from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import router as llm_router
+from app.llm.base import TruncatedOutputError
 from app.llm.budget import summary_budget
 from app.llm.util import public_reason
 from app.models.schemas import DeepDiveRequest, SummarizeRequest
@@ -191,9 +192,13 @@ def _audit_coverage(req: SummarizeRequest, content: Content, chunk: str,
                 if on_status:
                     on_status({**event, "phase": "coverage"})
 
-            raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
-                                             summarize_system(language), seg=index,
-                                             on_status=report)
+            try:
+                raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
+                                                 summarize_system(language), seg=index,
+                                                 on_status=report)
+            except TruncatedOutputError as e:
+                # 補做同樣可能撞到輸出上限：留下修得回來的卡片，並告知這段不完整
+                raw, label, data["truncated"] = e.partial, e.label, True
             more = _parse_cards(raw, language)
         except Exception as e:  # noqa: BLE001
             print(f"[summarize] 補做失敗，保留現有卡片：{e}", flush=True)
@@ -219,10 +224,19 @@ def _run_segment(req: SummarizeRequest, content: Content, chunk: str,
     profile = summary_budget(req.provider)
     prompt = budget_summarize_prompt(seg, language) if profile else summarize_prompt(seg, language)
     system = budget_summarize_system(language) if profile else summarize_system(language)
-    raw, model_used = llm_router.generate(req.provider, prompt, system, seg=index,
-                                          on_status=on_status)
+    # 輸出上限只屬於摘要的預算，不影響問答、翻譯與實作
+    limit = {"max_completion_tokens": profile.max_completion_tokens} if profile else {}
+    truncated = False
+    try:
+        raw, model_used = llm_router.generate(req.provider, prompt, system, seg=index,
+                                              on_status=on_status, **limit)
+    except TruncatedOutputError as e:
+        # 半份 JSON 通常還能修復出前面的卡片；留下卡片並告知使用者這段不完整
+        raw, model_used, truncated = e.partial, e.label, True
     t_gen = time.time() - t0
     data = _parse_cards(raw, language)
+    if truncated:
+        data["truncated"] = True
     # 低額度方案每段已縮短；避免覆蓋率稽核又暗中送出一份大請求。
     if profile:
         label = model_used
@@ -243,7 +257,7 @@ def summarize(req: SummarizeRequest) -> dict:
     title: str | None = None
     models_used: list[str] = []
     content_types: list[str] = []
-    failed = 0
+    failed = truncated = 0
 
     for i, chunk in enumerate(chunks):
         try:
@@ -254,6 +268,7 @@ def summarize(req: SummarizeRequest) -> dict:
             failed += 1
             print(f"[summarize] 片段 {i + 1}/{len(chunks)} 失敗，已跳過：{e}", flush=True)
             continue
+        truncated += bool(data.get("truncated"))
         if title is None:
             title = data.get("title")
         all_cards.extend(data.get("cards", []))
@@ -272,7 +287,8 @@ def summarize(req: SummarizeRequest) -> dict:
             "transcript_source": content.get("transcript_source"),
             "content_type": _pick_content_type(content_types),
             "cards": all_cards, "model_used": "、".join(models_used),
-            "segments": len(chunks), "failed_segments": failed}
+            "segments": len(chunks), "failed_segments": failed,
+            "truncated_segments": truncated}
 
 
 @router.post("/summarize_stream")
@@ -362,8 +378,11 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             ctype = data.get("content_type") or "other"
             content_types.append(ctype)
             # 每段都帶：前端第一段就能顯示「下一步」入口，done 事件再用多數決校正
-            yield line({"type": "cards", "seg": i, "cards": cards, "model": model_used,
-                        "content_type": ctype})
+            event = {"type": "cards", "seg": i, "cards": cards, "model": model_used,
+                     "content_type": ctype}
+            if data.get("truncated"):
+                event["truncated"] = True
+            yield line(event)
 
         with ThreadPoolExecutor(max_workers=workers) as ex:
             # 第一段優先：不和後段搶免費 API；完成並送到前端後，才平行跑剩餘段落。
@@ -396,6 +415,9 @@ def deepdive(req: DeepDiveRequest) -> dict:
             deepdive_prompt(req.source_title, req.card.model_dump(), language),
             deepdive_system(language))
         return {"content": to_traditional(text, language), "model_used": model_used}
+    except TruncatedOutputError as e:
+        return {"content": f"{to_traditional(e.partial, language)}\n\n{messages.t('summarize.deepdive_truncated')}",
+                "model_used": e.label}
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
