@@ -3,7 +3,7 @@ import * as api from '../api.js'
 import { useI18n } from '../i18n/index.jsx'
 import { ollamaModelOptions } from '../utils/ollama-settings.js'
 import { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
-import { aiSourceLabel } from '../utils/ai-source.js'
+import { aiSourceLabel, resolveAiSource } from '../utils/ai-source.js'
 
 // 每個引擎一列：欄位名 → 標籤／說明／輸入型別
 const ENGINES = [
@@ -115,7 +115,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
               {aiSelection!=='smart' && !PROVIDER_ORDER.some(k=>(providers?.[k]?.models||[]).some(m=>providerValue(k,m)===aiSelection)) &&
                 <option value={aiSelection}>{aiSelection} ({t('ai.unavailable')})</option>}
             </select>
-            <span className="settings-hint">{aiSourceLabel(aiSelection,aiSelection==='smart'?null:aiSelection,t)} · {t('ai.sharedHint')}</span>
+            <span className="settings-hint">{aiSourceLabel(aiSelection,resolveAiSource(aiSelection,providers),t)} · {t('ai.sharedHint')}</span>
             <span className="settings-hint">{t('ai.localPlanned')}</span>
           </label>
 
