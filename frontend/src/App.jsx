@@ -17,14 +17,14 @@ import useImplement from './hooks/useImplement.js'
 import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
-import { effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
+import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
 const SAVED=(()=>{try{return JSON.parse(localStorage.getItem(SKEY))||{}}catch{return {}}})()
 // 深視覺開關：獨立存一把 key，跨網址/工作階段延續使用者的偏好
-const DVKEY='ycr-deep-visual'
+const DVKEY=DEEP_VISUAL_KEY
 // 頂欄收合狀態：獨立存一把 key，跨工作階段延續使用者的偏好
 const TBKEY='ycr-topbar'
 // 影片欄／重點欄左右比例：獨立存一把 key，跨工作階段延續使用者拖過的比例
@@ -118,6 +118,7 @@ export default function App() {
 
   // Bilibili 不支援讀畫面：停用勾選框並說明原因（不改動使用者對 YouTube 的偏好設定）
   const bilibiliUrl=isBilibiliUrl(url)
+  const visualNotice=deepVisualNotice(deepVisual,url,!!providers?.gemini?.configured)
   const cards=result?.cards||[]
   const isBilibili=result?.source_type==='bilibili'&&!!result?.bilibili_video_id
   const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili
@@ -190,6 +191,7 @@ export default function App() {
             </details>
             <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
           </section>
+          {visualNotice&&<p className="subtitles-hint" role="status">{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</p>}
           <SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
         </>
       )}
