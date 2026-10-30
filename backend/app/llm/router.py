@@ -24,7 +24,7 @@ ANTHROPIC = "anthropic"
 OLLAMA = "ollama"
 
 # 帶 "<kind>:<model>" 前綴的供應商
-_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA)
+_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA, GEMINI)
 
 # 自動模式的首選（免費、不需金鑰）
 DEFAULT_AUTO_MODEL = opencode.DEFAULT_FREE_MODEL
@@ -62,7 +62,7 @@ def _call(kind: str, model: str, prompt: str, system: str, seg: int,
           on_status: Callable[[dict[str, Any]], None] | None) -> Tuple[str, str]:
     """對單一供應商發一次生成請求。"""
     if kind == GEMINI:
-        return gemini.generate(prompt, system, seg=seg, on_status=on_status)
+        return gemini.generate(prompt, system, seg=seg, on_status=on_status, model=model)
     if kind == OLLAMA:
         return ollama.generate(prompt, system, model=model, seg=seg, on_status=on_status)
     if kind == ANTHROPIC:
