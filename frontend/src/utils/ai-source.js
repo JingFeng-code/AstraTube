@@ -8,12 +8,13 @@ export function resolveAiSource(selected, providers = {}) {
   const installed = local?.configured ? (local.models || []) : []
   if (selected === 'smart') return installed.length ? `ollama:${installed[0]}` : null
   if (selected?.startsWith('ollama:')) return installed.includes(selected.slice(7)) ? selected : null
-  if (selected === 'gemini') return providers?.gemini?.configured ? 'gemini' : null
+  if (selected === 'gemini') return providers?.gemini?.configured ? 'gemini' : null // 舊版選項仍可讀取
   const sep = (selected || '').indexOf(':')
   if (sep < 1) return null
   const kind=selected.slice(0,sep), model=selected.slice(sep+1)
   const service=providers?.[kind]
-  return kind!=='ollama' && !!service?.configured && service.models?.includes(model) ? selected : null
+  // 連線驗證後的新模型可能不在舊版 /models 靜態清單，交由後端驗證。
+  return kind!=='ollama' && !!service?.configured && /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(model) ? selected : null
 }
 export function aiSourceLabel(selection, resolved, t) {
   if (selection==='smart') return resolved ? t('ai.smartReady') : t('ai.setupRequired')
