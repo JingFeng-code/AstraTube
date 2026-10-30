@@ -143,12 +143,13 @@ def generate(prompt: str, system: str = "", seg: int = 0,
 
 
 def generate_chat(chat_messages: list[dict], system: str = "", seg: int = 0,
-                  search: bool = True) -> Tuple[str, str]:
+                  search: bool = True, model: str | None = None) -> Tuple[str, str]:
     """多輪對話生成，預設掛 Google 搜尋工具（grounding），供「問模型」使用。
 
     chat_messages 為 [{"role": "user"|"assistant", "content": str}, ...]。
     搜尋工具不可用時自動退回純對話。回傳 (文字, 模型標籤)。
     """
+    use_model = model or MODEL
     contents = [
         types.Content(role=("user" if m["role"] == "user" else "model"),
                       parts=[types.Part(text=m["content"])])
@@ -166,23 +167,23 @@ def generate_chat(chat_messages: list[dict], system: str = "", seg: int = 0,
     def run_with(use_search: bool):
         def run(key: str) -> str:
             resp = _client(key).models.generate_content(
-                model=MODEL, contents=contents, config=make_config(use_search))
+                model=use_model, contents=contents, config=make_config(use_search))
             return resp.text or ""
-        return _over_keys(run, seg=seg, label=f"Gemini/{MODEL}/chat", tries=2)
+        return _over_keys(run, seg=seg, label=f"Gemini/{use_model}/chat", tries=2)
 
     global _search_down_until
     if search and time.time() < _search_down_until:
         search = False  # 搜尋工具額度冷卻中，直接走純對話省時間
     if search:
         try:
-            return run_with(True), LABEL + messages.t("gemini.search_suffix")
+            return run_with(True), use_model + messages.t("gemini.search_suffix")
         except Exception as e:  # noqa: BLE001
             if is_quota_error(e):
                 _search_down_until = time.time() + _SEARCH_COOLDOWN_S
                 print(f"[LLM] 搜尋工具額度全數上限，{int(_SEARCH_COOLDOWN_S / 60)} 分鐘內改走純對話。", flush=True)
             else:
                 print(f"[LLM] Gemini 搜尋工具失敗，退回純對話：{e}", flush=True)
-    return run_with(False), LABEL
+    return run_with(False), use_model
 
 
 def is_quota_error(e: Exception) -> bool:
