@@ -70,7 +70,7 @@ def resolve_provider(provider: str = "opencode") -> tuple[str, str, str]:
     if ":" in provider:
         import re
         kind, model = provider.split(":", 1)
-        if kind in ("openai", "deepseek", "anthropic", "opencode") and re.fullmatch(
+        if kind in ("openai", "deepseek", "anthropic", "opencode", "gemini") and re.fullmatch(
             r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}", model
         ):
             return kind, model, provider
