@@ -355,6 +355,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "Gemini 影片呼叫失敗",
         "en": "The Gemini video call failed",
     },
+    "llm.no_provider": {
+        "zh-Hant": "尚未選擇可用的 AI，請先到 AI 設定連接 Ollama 或選擇雲端供應商。",
+        "en": "No usable AI is selected. Open AI settings to connect Ollama or choose a cloud provider.",
+    },
     "llm.free_chain_failed": {
         "zh-Hant": "OpenCode 免費模型目前都無法使用（已試：{models}），請稍後再試；開發者模式也可以改用本地 Ollama。",
         "en": "No free OpenCode model is available right now (tried: {models}). Try again later, or use local Ollama in developer mode.",

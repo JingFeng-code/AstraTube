@@ -114,6 +114,8 @@ def _allows_cloud_transcription(provider: str | None) -> bool:
 
 def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
     """擷取內容並切段，回傳 (內容, 片段列表, 是否多段)。"""
+    if not llm_router.is_explicit(req.provider):
+        raise HTTPException(400, messages.t("llm.no_provider"))
     try:
         content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))
@@ -286,6 +288,10 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
 
     def gen() -> Iterator[str]:
         yield line({"type": "progress", "stage": "source", "completed": 0, "total": 0})
+        # 必須在擷取內容之前檢查：沒選 AI 時不能連影片都先交給 Gemini 轉錄
+        if not llm_router.is_explicit(req.provider):
+            yield line({"type": "fatal", "error": messages.t("llm.no_provider")})
+            return
         try:
             content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))

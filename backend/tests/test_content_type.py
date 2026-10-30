@@ -123,7 +123,7 @@ def test_stream_emits_content_type_per_segment_and_final_vote():
 
         summarize_api._run_segment = fake_run
 
-        response = summarize_api.summarize_stream(SummarizeRequest(url="https://example.com"))
+        response = summarize_api.summarize_stream(SummarizeRequest(url="https://example.com", provider="auto"))
         events = asyncio.run(_events(response))
         assert [e["content_type"] for e in events if e["type"] == "cards"] == ["other", "tutorial"]
         assert events[-1]["type"] == "done" and events[-1]["content_type"] == "tutorial"
