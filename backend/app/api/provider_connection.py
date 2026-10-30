@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core import config
-from app.llm import ollama, openai_compat
+from app.llm import ollama
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -62,7 +62,7 @@ def _models_from_rows(rows: list, *, provider: str = "") -> list[str]:
         if provider == "groq" and any(block in value.lower() for block in ("guard", "prompt-guard")):
             continue
         # Mistral 直接提供是否支援 Chat Completion 的能力旗標。
-        if provider == "mistral" and item.get("capabilities", {}).get("completion_chat") is False:
+        if provider == "mistral" and (item.get("capabilities") or {}).get("completion_chat") is False:
             continue
         # OpenRouter 可能包含僅產生圖片／音訊的模型；只列有文字輸出者。
         if provider == "openrouter":
