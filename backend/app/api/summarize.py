@@ -204,9 +204,13 @@ def _audit_coverage(req: SummarizeRequest, content: Content, chunk: str,
                 if on_status:
                     on_status({**event, "phase": "coverage"})
 
-            raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
-                                             summarize_system(language), seg=index,
-                                             on_status=report)
+            try:
+                raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
+                                                 summarize_system(language), seg=index,
+                                                 on_status=report)
+            except TruncatedOutputError as e:
+                # 補做同樣可能撞到輸出上限：留下修得回來的卡片，並告知這段不完整
+                raw, label, data["truncated"] = e.partial, e.label, True
             more = _parse_cards(raw, language)
         except Exception as e:  # noqa: BLE001
             print(f"[summarize] 補做失敗，保留現有卡片：{e}", flush=True)

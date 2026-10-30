@@ -11,7 +11,7 @@ from typing import Any, Callable, Tuple
 from app.core import config, messages
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           RefusalError)
-from app.llm.util import connect_error, http_error, with_retry
+from app.llm.util import connect_error, http_error, safe_finish_reason, with_retry
 
 LABEL = "Claude"
 CONSOLE_URL = "https://console.anthropic.com/settings/keys"
@@ -115,7 +115,7 @@ def _once(model: str, chat_messages: list[dict], system: str) -> str:
     if not text.strip():
         raise EmptyResponseError(messages.t(
             "provider.empty_response", vendor=LABEL,
-            reason=f"stop_reason={getattr(resp, 'stop_reason', None)}"))
+            reason=f"stop_reason={safe_finish_reason(getattr(resp, 'stop_reason', None))}"))
     return text
 
 

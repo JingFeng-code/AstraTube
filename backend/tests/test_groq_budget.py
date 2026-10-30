@@ -235,6 +235,49 @@ def test_truncated_summary_keeps_cards_and_warns():
     assert cards["truncated"] is True and cards["cards"][0]["heading"] == "h"
 
 
+def _coverage_generate(second):
+    """第一次回傳只到開頭的卡片，觸發覆蓋率補做；第二次由 second 決定結果。"""
+    first = json.dumps({"title": "t", "cards": [
+        {"heading": "開頭", "summary": "s", "timestamp_seconds": 0}]}, ensure_ascii=False)
+    return [(first, "m"), second]
+
+
+def _audit_chunk():
+    return "\n".join(f"[{t}] {'逐字稿內容' * 10}" for t in range(0, 1000, 60))
+
+
+def test_truncated_coverage_reply_keeps_cards_and_warns():
+    partial = '{"title":"t","cards":[{"heading":"補做","summary":"s","timestamp_seconds":600},{"heading":"第二張'
+    side_effect = _coverage_generate(TruncatedOutputError("x", partial, "m"))
+    with patch.object(summary_api.llm_router, "generate", side_effect=side_effect):
+        data, _ = summary_api._run_segment(SummarizeRequest(url="https://example.com", provider="auto"),
+                                           {"type": "youtube", "has_timestamps": True},
+                                           _audit_chunk(), 0, False)
+    assert [c["heading"] for c in data["cards"]][:2] == ["開頭", "補做"]
+    assert data["truncated"] is True
+
+
+def test_unrepairable_coverage_reply_still_warns():
+    side_effect = _coverage_generate(TruncatedOutputError("x", "", "m"))
+    with patch.object(summary_api.llm_router, "generate", side_effect=side_effect):
+        data, _ = summary_api._run_segment(SummarizeRequest(url="https://example.com", provider="auto"),
+                                           {"type": "youtube", "has_timestamps": True},
+                                           _audit_chunk(), 0, False)
+    assert [c["heading"] for c in data["cards"]] == ["開頭"]
+    assert data["truncated"] is True
+
+
+def test_complete_coverage_reply_is_not_marked_truncated():
+    more = json.dumps({"cards": [{"heading": "補做", "summary": "s", "timestamp_seconds": 600}]}, ensure_ascii=False)
+    side_effect = _coverage_generate((more, "m"))
+    with patch.object(summary_api.llm_router, "generate", side_effect=side_effect):
+        data, _ = summary_api._run_segment(SummarizeRequest(url="https://example.com", provider="auto"),
+                                           {"type": "youtube", "has_timestamps": True},
+                                           _audit_chunk(), 0, False)
+    assert [c["heading"] for c in data["cards"]] == ["開頭", "補做"]
+    assert "truncated" not in data
+
+
 def test_truncated_translation_is_not_cached():
     response = '{"translations":[{"id":0,"text":"譯文"}]}'
     _, (a, b, c, d) = _groq_post(httpx.Response(200, json={"choices": [
@@ -318,6 +361,9 @@ if __name__ == "__main__":
     test_truncated_reply_raises_without_retry()
     test_ask_and_deepdive_show_partial_with_notice()
     test_truncated_summary_keeps_cards_and_warns()
+    test_truncated_coverage_reply_keeps_cards_and_warns()
+    test_unrepairable_coverage_reply_still_warns()
+    test_complete_coverage_reply_is_not_marked_truncated()
     test_truncated_translation_is_not_cached()
     test_only_groq_uses_lower_budget()
     test_budget_prompt_is_shorter_and_still_has_card_schema()

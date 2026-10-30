@@ -13,7 +13,8 @@ from fastapi import HTTPException  # noqa: E402
 from app.api import ask as ask_api, implement as implement_api  # noqa: E402
 from app.api import subtitles as subtitles_api, summarize as summarize_api  # noqa: E402
 from app.llm import anthropic_api, gemini, opencode, openai_compat, router  # noqa: E402
-from app.llm.util import user_error  # noqa: E402
+from app.llm.base import EmptyResponseError  # noqa: E402
+from app.llm.util import safe_finish_reason, user_error  # noqa: E402
 from app.models.schemas import AskRequest, DeepDiveRequest, ImplementRequest, SummarizeRequest  # noqa: E402
 from app.transcript import subtitle_translation  # noqa: E402
 
@@ -194,6 +195,40 @@ def test_groq_final_429_does_not_say_still_waiting():
     assert "正在" not in shown and "仍未成功" in shown and "UPSTREAM_ECHO" not in shown
 
 
+def _empty_openai_error(finish_reason):
+    response = httpx.Response(200, json={"choices": [
+        {"message": {"content": ""}, "finish_reason": finish_reason}]})
+    a, b, c = _failing_openai(response)
+    with a, b, c:
+        try:
+            openai_compat._post_chat(openai_compat.OPENAI, "gpt-x", [{"role": "user", "content": "hi"}])
+        except EmptyResponseError as exc:
+            return exc
+    raise AssertionError("空回應應該丟出 EmptyResponseError")
+
+
+def test_empty_response_never_shows_unknown_finish_reason():
+    shown = user_error(_empty_openai_error(SECRET), "openai:gpt-x")
+    assert "UPSTREAM_ECHO" not in shown and "finish_reason=unknown" in shown
+    assert "finish_reason=length" in user_error(_empty_openai_error("length"), "openai:gpt-x")
+
+    response = httpx.Response(200, json={"choices": [
+        {"message": {"content": ""}, "finish_reason": SECRET}]})
+    with patch.object(opencode.httpx, "post", return_value=response):
+        try:
+            opencode._post_chat("x-free", [{"role": "user", "content": "hi"}])
+            assert False, "空回應應該丟出 EmptyResponseError"
+        except EmptyResponseError as exc:
+            assert "UPSTREAM_ECHO" not in user_error(exc)
+
+
+def test_safe_finish_reason_only_allows_known_values():
+    assert safe_finish_reason("stop") == "stop"
+    assert safe_finish_reason("end_turn") == "end_turn"
+    for bad in (None, "", 123, ["stop"], "STOP", SECRET):
+        assert safe_finish_reason(bad) == "unknown", bad
+
+
 if __name__ == "__main__":
     test_stream_seg_error_never_contains_upstream_body()
     test_ask_and_deepdive_never_contain_upstream_body()
@@ -205,4 +240,6 @@ if __name__ == "__main__":
     test_translation_error_names_the_right_service_and_is_complete()
     test_long_free_chain_message_keeps_status_and_advice()
     test_groq_final_429_does_not_say_still_waiting()
+    test_empty_response_never_shows_unknown_finish_reason()
+    test_safe_finish_reason_only_allows_known_values()
     print("Public error tests passed.")
