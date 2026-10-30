@@ -224,6 +224,7 @@ export const STRINGS = {
     'settings.ollamaUnavailable': 'Cannot reach local Ollama.',
     'settings.ollamaCheckHint': 'Tests the address typed above; no need to save first. AstraTube never downloads models for you.',
 
+    'ai.freeServices': 'Free online AI',
     'ai.chooseProvider': '1. Choose an AI provider',
     'ai.apiKey': '2. API key',
     'ai.verifyConnection': 'Verify connection and fetch models',
@@ -534,6 +535,7 @@ export const STRINGS = {
     'settings.ollamaUnavailable': '無法連線到本機 Ollama。',
     'settings.ollamaCheckHint': '會使用上方輸入的網址測試，不需要先儲存；AstraTube 不會自動下載模型。',
 
+    'ai.freeServices': '免費線上 AI',
     'ai.chooseProvider': '1. 選擇 AI 供應商',
     'ai.apiKey': '2. API Key',
     'ai.verifyConnection': '驗證連線並取得模型',
