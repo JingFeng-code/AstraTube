@@ -8,7 +8,7 @@
 
 YouTube 影片支援透過官方 IFrame API 對齊播放器時間的字幕閱讀；YouTube 與 Bilibili 均可搜尋公開字幕，點擊文字時間戳跳轉播放器。B 站官方站外播放器沒有同等可靠的公開讀取進度 API，目前僅支援點擊時間跳轉。
 
-字幕工作區支援原文與台灣繁中對照；一般模式可按鈕逐批使用第三方免費模型翻譯，開發者模式也可明確選擇本地 Ollama。免費模型可能限流。原本的摘要及卡片問答功能不受影響。詳情見 [開發路線](docs/ROADMAP.md)。
+字幕工作區支援原文與台灣繁中對照；選定本機 Ollama 或自行設定金鑰的雲端 AI 後，可逐批翻譯字幕。模型供應商、字幕翻譯、摘要及問答共用同一選擇。詳情見 [開發路線](docs/ROADMAP.md)。
 
 參閱 [繁中雙語字幕與快取說明](docs/BILINGUAL_SUBTITLES.zh-TW.md)。
 
@@ -28,7 +28,7 @@ B 站影片使用官方嵌入播放器，可透過知識卡跳至時間戳；部
 
 在設定選擇「AI 供應商 → 驗證連線 → 選擇模型 → 儲存」。使用者不用一開始就面對一大串模型 ID；需要 API Key 的供應商先驗證憑證，再載入實際可見模型。已存過金鑰則可直接驗證，不須重新輸入。
 
-智慧模式只使用可用的本地 Ollama，不會暗中改用免費或付費雲端服務；OpenCode 免費模型需要使用者明確選擇，仍可能有限流或下架。完整步驟見 [AI 供應商與模型設定](docs/AI_PROVIDER_SETUP.zh-TW.md)。
+智慧模式只使用可用的本地 Ollama，不會暗中改用雲端服務；可另選 Gemini、OpenAI、DeepSeek、Anthropic、OpenRouter、Groq、Mistral AI、Together AI 等自備金鑰供應商。已移除不可穩定供第三方程式呼叫的 OpenCode 免費線上選項。完整步驟見 [AI 供應商與模型設定](docs/AI_PROVIDER_SETUP.zh-TW.md)。
 
 ## Ollama（選用的本地 AI）
 
@@ -48,16 +48,16 @@ Windows 版以**免安裝資料夾**發行：解壓縮後雙擊 `AstraTube.exe` 
    ```
 
 3. 在 **Ports** 面板開啟 **AstraTube Web (15273)** 的轉送網址；保持 Port Visibility 為 **Private**。
-4. 使用有現成字幕的影片測試知識卡與問答。外部免費模型的服務狀態與額度由提供者決定。
+4. 如需知識卡與問答，請先在 AI 設定中選擇可用的供應商（本機 Ollama 或自行提供 API Key）。
 
-第一次執行會下載並安裝 Python/Node 套件；不需要先購買 API 額度。**Codespaces 無法直接使用你個人 Windows 的 Ollama / GPU**。本地運行請參閱 [繁中開發指南](docs/DEVELOPMENT.zh-TW.md)。
+第一次執行會下載並安裝 Python/Node 套件；影片字幕閱讀可不設定雲端金鑰，但使用 AI 生成功能須準備本機 Ollama 或可用的雲端 API Key。**Codespaces 無法直接使用你個人 Windows 的 Ollama / GPU**。本地運行請參閱 [繁中開發指南](docs/DEVELOPMENT.zh-TW.md)。
 
 ## 使用中的開源技術
 
 - **React 18 + Vite**：保留上游 UI；現階段不重寫 Vue / .NET。
 - **FastAPI**：影片字幕來源、知識卡、AI 問答、實作任務、Obsidian。
 - **本地 Whisper**：沿用上游程式，但轉錄可能需要獲授權的音訊來源。
-- **OpenCode Zen / 自備雲端 API / Ollama**：支援免費文字模型、自備模型 API，以及同環境的本地 Ollama。
+- **自備雲端 API / Ollama**：支援多家雲端 AI 供應商與同環境的本地 Ollama；不依賴 OpenCode 免費接力。
 - **GitHub Actions**：上游內建前端建置與後端單元測試。
 
 ## 安全與費用
