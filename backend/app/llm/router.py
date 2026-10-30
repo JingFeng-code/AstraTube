@@ -24,7 +24,8 @@ ANTHROPIC = "anthropic"
 OLLAMA = "ollama"
 
 # 帶 "<kind>:<model>" 前綴的供應商
-_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA, GEMINI)
+_PREFIXED = (OPENCODE, DEEPSEEK, OPENAI, ANTHROPIC, OLLAMA, GEMINI,
+             "openrouter", "groq", "mistral", "together")
 
 # 自動模式的首選（免費、不需金鑰）
 DEFAULT_AUTO_MODEL = opencode.DEFAULT_FREE_MODEL
