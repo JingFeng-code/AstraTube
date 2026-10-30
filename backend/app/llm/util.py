@@ -84,6 +84,18 @@ def _status_hint(status: int) -> str:
     return ""
 
 
+# 空回應時可以顯示的結束原因（OpenAI 相容服務與 Anthropic 的標準值）
+_KNOWN_FINISH_REASONS = frozenset({
+    "stop", "length", "content_filter", "tool_calls", "function_call",
+    "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal",
+})
+
+
+def safe_finish_reason(value: Any) -> str:
+    """結束原因由上游提供，可能夾帶任意文字；只放行已知的值，其餘一律不顯示原文。"""
+    return value if isinstance(value, str) and value in _KNOWN_FINISH_REASONS else "unknown"
+
+
 def public_reason(error: Exception) -> str:
     """可以安全顯示給瀏覽器的原因：只含狀態碼與我們自己寫的建議，不含服務端回應原文。
 
