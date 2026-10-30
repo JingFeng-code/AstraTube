@@ -72,10 +72,27 @@ def test_gemini_selected_model_reaches_router_and_translation():
     assert generate.call_args.kwargs["model"] == "gemini-3.5-flash"
 
 
+
+def test_ask_uses_selected_gemini_model_but_preserves_legacy_auto():
+    from app.api import ask as ask_api
+    from app.llm import gemini
+    from app.models.schemas import AskRequest
+
+    with patch.object(ask_api, "_load_transcript", return_value="[0] sample"), \\
+         patch.object(gemini, "key_count", return_value=1), \\
+         patch.object(gemini, "generate_chat", return_value=("ok", gemini.MODEL)) as mocked:
+        ask_api.ask(AskRequest(question="What?", video_id="dQw4w9WgXcQ", provider=None))
+        assert mocked.call_args.kwargs["model"] == gemini.MODEL
+        ask_api.ask(AskRequest(question="What?", video_id="dQw4w9WgXcQ",
+                                provider="gemini:gemini-custom"))
+        assert mocked.call_args.kwargs["model"] == "gemini-custom"
+
+
 if __name__ == "__main__":
     test_provider_check_uses_supplied_key_without_persisting()
     test_existing_key_can_be_verified_without_exposing_it()
     test_wrong_key_and_missing_key_do_not_return_static_models()
     test_ollama_only_returns_installed_models()
     test_gemini_selected_model_reaches_router_and_translation()
+    test_ask_uses_selected_gemini_model_but_preserves_legacy_auto()
     print("AI provider connection tests passed")
