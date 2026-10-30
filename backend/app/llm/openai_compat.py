@@ -52,7 +52,40 @@ OPENAI = Vendor(
     console_url="https://platform.openai.com/api-keys",
 )
 
-VENDORS: dict[str, Vendor] = {v.key: v for v in (DEEPSEEK, OPENAI)}
+# 多個 API 供應商共用相同的 Chat Completions 實作，不自行推測是否免費。
+# 新供應商的模型由金鑰驗證時動態讀取，不使用可能已過期的固定清單。
+OPENROUTER = Vendor(
+    key="openrouter", label="OpenRouter",
+    base_url="https://openrouter.ai/api/v1",
+    config_key="OPENROUTER_API_KEY",
+    default_model="", static_models=(),
+    console_url="https://openrouter.ai/settings/keys",
+)
+GROQ = Vendor(
+    key="groq", label="Groq",
+    base_url="https://api.groq.com/openai/v1",
+    config_key="GROQ_API_KEY",
+    default_model="", static_models=(),
+    console_url="https://console.groq.com/keys",
+)
+MISTRAL = Vendor(
+    key="mistral", label="Mistral AI",
+    base_url="https://api.mistral.ai/v1",
+    config_key="MISTRAL_API_KEY",
+    default_model="", static_models=(),
+    console_url="https://console.mistral.ai/",
+)
+TOGETHER = Vendor(
+    key="together", label="Together AI",
+    base_url="https://api.together.ai/v1",
+    config_key="TOGETHER_API_KEY",
+    default_model="", static_models=(),
+    console_url="https://api.together.ai/settings/api-keys",
+)
+
+VENDORS: dict[str, Vendor] = {
+    v.key: v for v in (DEEPSEEK, OPENAI, OPENROUTER, GROQ, MISTRAL, TOGETHER)
+}
 
 # vendor.key -> (抓取時間, 模型清單, 來源)
 _models_cache: dict[str, tuple[float, list[str], str]] = {}
