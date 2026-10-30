@@ -154,8 +154,11 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
               <optgroup label={t('ai.local')}>
                 <option value="ollama">Ollama</option>
               </optgroup>
+              <optgroup label={t('ai.freeServices')}>
+                <option value="opencode">{providers?.opencode?.label || 'OpenCode'}</option>
+              </optgroup>
               <optgroup label={t('ai.cloud')}>
-                {PROVIDER_ORDER.filter(p=>p!=='ollama').map(p=>
+                {PROVIDER_ORDER.filter(p=>p!=='ollama' && p!=='opencode').map(p=>
                   <option key={p} value={p}>{providers?.[p]?.label || p}</option>
                 )}
               </optgroup>
