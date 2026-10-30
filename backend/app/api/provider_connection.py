@@ -71,7 +71,8 @@ def _models_from_rows(rows: list, *, provider: str = "") -> list[str]:
                 continue
         if value not in names:
             names.append(value)
-    return names[:200]
+    # OpenRouter 的目錄可能超過數百筆，搭配前端搜尋欄而不是在此截斷。
+    return names[:1500] if provider == "openrouter" else names[:300]
 
 
 def _require_http_ok(res: httpx.Response) -> None:
