@@ -20,5 +20,10 @@ export function aiSourceLabel(selection, resolved, t) {
   if (selection==='smart') return resolved ? t('ai.smartReady') : t('ai.setupRequired')
   if (selection?.startsWith('ollama:')) return resolved ? `Ollama · ${selection.slice(7)}` : t('ai.setupRequired')
   if (!resolved) return t('ai.setupRequired')
-  return selection === 'gemini' ? 'Gemini' : resolved
+  const split = resolved.indexOf(':')
+  if (split < 1) return selection === 'gemini' ? 'Google Gemini' : resolved
+  const kind = resolved.slice(0, split)
+  const model = resolved.slice(split + 1)
+  const names = { gemini:'Google Gemini', opencode:'OpenCode', openai:'OpenAI', deepseek:'DeepSeek', anthropic:'Claude' }
+  return `${names[kind] || kind} · ${model}`
 }
