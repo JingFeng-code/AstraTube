@@ -13,9 +13,12 @@ from json_repair import repair_json
 from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import router as llm_router
+from app.llm.budget import summary_budget
+from app.llm.util import public_reason
 from app.models.schemas import DeepDiveRequest, SummarizeRequest
 from app.prompts.summarize import (deepdive_prompt, deepdive_system,
-                                   summarize_prompt, summarize_system)
+                                   summarize_prompt, summarize_system,
+                                   budget_summarize_prompt, budget_summarize_system)
 from app.services.chunker import chunk_content
 from app.transcript.router import Content, route_content
 
@@ -120,7 +123,9 @@ def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
         raise HTTPException(500, messages.t("summarize.fetch_failed", error=e))
 
     has_ts = content.get("has_timestamps") or content["type"] == "youtube"
-    chunks = chunk_content(content["text"], bool(has_ts))
+    profile = summary_budget(req.provider)
+    chunks = (chunk_content(content["text"], bool(has_ts), chunk_chars=profile.chunk_chars)
+              if profile else chunk_content(content["text"], bool(has_ts)))
     return content, chunks, len(chunks) > 1
 
 
@@ -209,12 +214,19 @@ def _run_segment(req: SummarizeRequest, content: Content, chunk: str,
     t0 = time.time()
     language = config.get("OUTPUT_LANGUAGE")
     seg: dict[str, Any] = {**content, "text": chunk, "is_segment": multi}
-    raw, model_used = llm_router.generate(req.provider, summarize_prompt(seg, language),
-                                          summarize_system(language), seg=index,
+    profile = summary_budget(req.provider)
+    prompt = budget_summarize_prompt(seg, language) if profile else summarize_prompt(seg, language)
+    system = budget_summarize_system(language) if profile else summarize_system(language)
+    raw, model_used = llm_router.generate(req.provider, prompt, system, seg=index,
                                           on_status=on_status)
     t_gen = time.time() - t0
-    data, label = _audit_coverage(req, content, chunk, index, _parse_cards(raw, language),
-                                  model_used, language, on_status=on_status)
+    data = _parse_cards(raw, language)
+    # 低額度方案每段已縮短；避免覆蓋率稽核又暗中送出一份大請求。
+    if profile:
+        label = model_used
+    else:
+        data, label = _audit_coverage(req, content, chunk, index, data,
+                                      model_used, language, on_status=on_status)
     print(f"[summarize] 片段 {index + 1} 完成：{len(data.get('cards') or [])} 張卡，"
           f"生成 {t_gen:.1f}s／總計 {time.time() - t0:.1f}s（{label}）", flush=True)
     return data, label
@@ -278,7 +290,9 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))
             has_ts = content.get("has_timestamps") or content["type"] == "youtube"
-            chunks = chunk_content(content["text"], bool(has_ts))
+            profile = summary_budget(req.provider)
+            chunks = (chunk_content(content["text"], bool(has_ts), chunk_chars=profile.chunk_chars)
+                      if profile else chunk_content(content["text"], bool(has_ts)))
         except ValueError as e:
             yield line({"type": "fatal", "error": str(e)})
             return
@@ -288,7 +302,7 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             return
 
         multi = len(chunks) > 1
-        workers = llm_router.parallel_workers(req.provider, len(chunks))
+        workers = profile.workers if profile else llm_router.parallel_workers(req.provider, len(chunks))
         yield line({"type": "meta", "source_type": content["type"], "source_url": req.url,
                     "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
             "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
@@ -329,7 +343,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 return
             except Exception as e:  # noqa: BLE001
                 failed += 1
-                yield line({"type": "seg_error", "seg": i, "error": str(e)[:200]})
+                yield line({"type": "seg_error", "seg": i,
+                            "error": public_reason(e) or str(e)[:200]})
                 return
             if title is None and data.get("title"):
                 title = data.get("title")
