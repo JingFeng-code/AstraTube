@@ -20,7 +20,7 @@ def is_transient(e: Exception) -> bool:
     from app.llm.base import EmptyResponseError
     if isinstance(e, EmptyResponseError):
         return True  # 空回應重試通常就好，不該當成永久失敗直接放棄整段
-    if getattr(e, "model_unavailable", False):
+    if getattr(e, "model_unavailable", False) or getattr(e, "permanent_rate_limit", False):
         return False  # 模型下架／暫停：重試同一個模型沒用，直接換下一個
     code = getattr(e, "code", None) or getattr(e, "status_code", None)
     try:
@@ -46,7 +46,9 @@ def with_retry(fn: Callable[[], T], *, tries: int = 3, base: float = 0.8,
             last = e
             if i == tries - 1 or not is_transient(e):
                 raise
-            sleep = min(base * (2 ** i), max_sleep)
+            suggested = getattr(e, "retry_after", None)
+            sleep = (min(120.0, max(0.0, float(suggested))) if suggested is not None
+                     else min(base * (2 ** i), max_sleep))
             print(f"[LLM] {label} 暫時性錯誤，{sleep:.1f}s 後重試（第 {i + 1} 次）：{e}", flush=True)
             if on_status:
                 on_status({"state": "retry_wait", "attempt": i + 2,
