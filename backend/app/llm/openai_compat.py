@@ -147,6 +147,12 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
             max_completion_tokens = min(max_completion_tokens or budget.max_completion_tokens,
                                         budget.max_completion_tokens)
             request["max_completion_tokens"] = max_completion_tokens
+            # Groq Qwen 3.8 支援 none（不消耗思考 Token），比較適合精簡 JSON 卡片。
+            # GPT-OSS 不支援 none，改用 low；不要把此選項套到其他模型。
+            if model == "qwen/qwen3.8-27b":
+                request["reasoning_effort"] = "none"
+            elif model in ("openai/gpt-oss-20b", "openai/gpt-oss-120b"):
+                request["reasoning_effort"] = "low"
             planned = estimate_tokens(chat_messages) + max_completion_tokens
             if planned > budget.tokens_per_minute:
                 err = ProviderError("Groq 輸入加輸出預算超過目前的保守每分鐘限額，請縮短內容。")
