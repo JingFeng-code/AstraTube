@@ -1,8 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { effectiveDeepVisual } from '../src/utils/user-mode.js'
+import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual } from '../src/utils/user-mode.js'
 import { initialAiSource, resolveAiSource } from '../src/utils/ai-source.js'
 import { createNoteMarkdown, markdownFilename } from '../src/utils/notes-export.js'
+
+test('讀畫面不沿用開發者模式時期的舊設定，開啟時明確說明影片去向',()=>{
+  assert.notEqual(DEEP_VISUAL_KEY,'ycr-deep-visual')
+  const video='https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+  assert.equal(deepVisualNotice(false,video,true),null)
+  assert.equal(deepVisualNotice(true,video,true),'gemini')
+  assert.equal(deepVisualNotice(true,video,false),'no-key')
+  assert.equal(deepVisualNotice(true,'https://www.bilibili.com/video/BV1B7411m7LV/',true),null)
+})
 
 test('舊一般模式遷移為本機智慧模式，保留舊 Ollama 選擇',()=>{
   assert.equal(initialAiSource(null,'free'),'smart')
