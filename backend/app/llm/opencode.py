@@ -9,7 +9,7 @@ import httpx
 
 from app.core import config, messages
 from app.llm.base import EmptyResponseError, ProviderError
-from app.llm.util import connect_error, http_error, response_error, with_retry
+from app.llm.util import connect_error, http_error, response_error, safe_finish_reason, with_retry
 
 BASE_URL = "https://opencode.ai/zen/v1"
 DEFAULT_FREE_MODEL = "deepseek-v4-flash-free"
@@ -139,7 +139,7 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
     if not text.strip():
         finish = choices[0].get("finish_reason") if choices else None
         raise EmptyResponseError(messages.t("provider.empty_response", vendor="OpenCode",
-                                            reason=f"finish_reason={finish}"))
+                                            reason=f"finish_reason={safe_finish_reason(finish)}"))
     return text
 
 

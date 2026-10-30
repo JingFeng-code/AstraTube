@@ -41,7 +41,7 @@ class EmptyResponseError(ProviderError):
 
     def __init__(self, message: str):
         super().__init__(message)
-        self.public_message = message  # 訊息只含供應商名稱與 finish_reason，可以顯示
+        self.public_message = message  # 訊息只含供應商名稱與過濾後的結束原因，可以顯示
 
 
 class LLMProvider(Protocol):

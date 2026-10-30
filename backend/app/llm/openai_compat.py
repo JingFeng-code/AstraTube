@@ -13,7 +13,7 @@ from app.core import config, messages
 from app.llm.budget import MIN_GROQ_OUTPUT, groq_pacer, summary_budget, estimate_tokens
 from app.llm.base import (EmptyResponseError, NotConfiguredError,
                           ProviderError, TruncatedOutputError)
-from app.llm.util import connect_error, http_error, response_error, with_retry
+from app.llm.util import connect_error, http_error, response_error, safe_finish_reason, with_retry
 
 # 推理型模型（deepseek-reasoner、gpt-5 thinking 等）單次摘要可能跑數分鐘，讀取逾時要給足
 _CHAT_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=60.0, pool=15.0)
@@ -210,7 +210,7 @@ def _post_chat(vendor: Vendor, model: str, chat_messages: list[dict],
     if not text.strip():
         finish = choices[0].get("finish_reason") if choices else None
         raise EmptyResponseError(messages.t("provider.empty_response", vendor=vendor.label,
-                                            reason=f"finish_reason={finish}"))
+                                            reason=f"finish_reason={safe_finish_reason(finish)}"))
     if choices[0].get("finish_reason") == "length":
         raise TruncatedOutputError(messages.t("provider.truncated", vendor=vendor.label),
                                    partial=text, label=f"{vendor.label}/{model}")
