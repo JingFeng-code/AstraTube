@@ -224,7 +224,6 @@ export const STRINGS = {
     'settings.ollamaUnavailable': 'Cannot reach local Ollama.',
     'settings.ollamaCheckHint': 'Tests the address typed above; no need to save first. AstraTube never downloads models for you.',
 
-    'ai.freeServices': 'Free online AI',
     'ai.chooseProvider': '1. Choose an AI provider',
     'ai.apiKey': '2. API key',
     'ai.verifyConnection': 'Verify connection and fetch models',
@@ -232,6 +231,7 @@ export const STRINGS = {
     'ai.verified': (count) => `Connected · ${count} models found`,
     'ai.verifyFailed': (detail) => `Connection failed: ${detail}`,
     'ai.verifyBeforeSave': 'Verify the connection and select an available model before switching AI providers.',
+    'ai.searchModel': 'Search models by name…',
     'ai.chooseModel': '3. Choose a model',
     'ai.selectModel': 'Choose a model…',
     'ai.modelsLiveHint': 'Only models returned by this provider after connection verification are shown. Availability or billing may still depend on your account.',
@@ -535,7 +535,6 @@ export const STRINGS = {
     'settings.ollamaUnavailable': '無法連線到本機 Ollama。',
     'settings.ollamaCheckHint': '會使用上方輸入的網址測試，不需要先儲存；AstraTube 不會自動下載模型。',
 
-    'ai.freeServices': '免費線上 AI',
     'ai.chooseProvider': '1. 選擇 AI 供應商',
     'ai.apiKey': '2. API Key',
     'ai.verifyConnection': '驗證連線並取得模型',
@@ -543,6 +542,7 @@ export const STRINGS = {
     'ai.verified': (count) => `連線成功 · 取得 ${count} 個模型`,
     'ai.verifyFailed': (detail) => `連線驗證失敗：${detail}`,
     'ai.verifyBeforeSave': '切換 AI 供應商前，請先驗證連線並選擇可用模型。',
+    'ai.searchModel': '搜尋模型名稱…',
     'ai.chooseModel': '3. 選擇 AI 模型',
     'ai.selectModel': '請選擇模型…',
     'ai.modelsLiveHint': '僅顯示供應商在驗證成功後實際回傳的模型；是否可呼叫或計費仍取決於帳號權限。',
