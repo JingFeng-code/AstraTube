@@ -206,7 +206,7 @@ export const STRINGS = {
     'panel.expand': (t) => `Open ${t}`,
     'panel.minimize': 'Minimise',
 
-    'settings.welcome': 'Welcome to Youtube Card Reader',
+    'settings.welcome': 'Welcome to AstraTube',
     'settings.title': 'Settings',
     'settings.ollamaSection': 'Ollama · Local AI',
     'settings.ollamaUrl': 'Ollama server address',
@@ -249,7 +249,7 @@ export const STRINGS = {
     'ai.connectionSettings': 'Advanced connections: Ollama, API keys & Obsidian',
     'ai.localPlanned': 'Downloadable built-in AI models will arrive in a future release.',
     'ai.unavailable': 'Unavailable',
-    'ai.advancedAnalysis': 'Advanced analysis',
+    'ai.advancedAnalysis': 'Analysis options',
     'ai.deepVisualGemini': 'Read screen is on: the video will be sent to Google Gemini, whichever AI is selected. Turn it off under Advanced analysis.',
     'ai.deepVisualNoKey': 'Read screen is on but no Gemini key is set, so only subtitles will be used.',
     'ai.advancedTools': 'Advanced tools',
@@ -301,7 +301,7 @@ export const STRINGS = {
     'error.pickNote': 'Choose a note to append to first',
 
     'notes.downloadMarkdown': 'Download Markdown notes',
-    'note.summary': 'Youtube Card Reader summary',
+    'note.summary': 'AstraTube summary',
     'note.untitled': 'Untitled note',
     'note.highlights': 'Highlights',
     'note.source': 'Source',
@@ -513,7 +513,7 @@ export const STRINGS = {
     'panel.expand': (t) => `展開${t}`,
     'panel.minimize': '最小化',
 
-    'settings.welcome': '歡迎使用 Youtube Card Reader',
+    'settings.welcome': '歡迎使用 AstraTube',
     'settings.title': '設定',
     'settings.ollamaSection': 'Ollama 本地 AI',
     'settings.ollamaUrl': 'Ollama 服務網址',
@@ -556,7 +556,7 @@ export const STRINGS = {
     'ai.connectionSettings': '進階連線設定：Ollama、API 金鑰與 Obsidian',
     'ai.localPlanned': '內建 AI 模型自動下載將於後續版本推出。',
     'ai.unavailable': '不可用',
-    'ai.advancedAnalysis': '進階分析',
+    'ai.advancedAnalysis': '分析選項',
     'ai.deepVisualGemini': '「讀畫面」已開啟：不論目前選擇哪個 AI，影片都會送到 Google Gemini 分析。可在「進階分析」關閉。',
     'ai.deepVisualNoKey': '「讀畫面」已開啟，但尚未設定 Gemini 金鑰，所以只會使用字幕。',
     'ai.advancedTools': '進階工具',
@@ -608,7 +608,7 @@ export const STRINGS = {
     'error.pickNote': '請先選擇要附加的筆記',
 
     'notes.downloadMarkdown': '下載 Markdown 筆記',
-    'note.summary': 'Youtube Card Reader 摘要',
+    'note.summary': 'AstraTube 摘要',
     'note.untitled': '未命名筆記',
     'note.highlights': '重點摘錄',
     'note.source': '來源',
