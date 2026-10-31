@@ -86,7 +86,7 @@ function YouTubePlayer({ videoId, startAt, onTime }) {
     referrerPolicy="strict-origin-when-cross-origin" />
 }
 
-export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, provider=null, subtitleRevision=0 }) {
+export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, tabs=[], tab='subtitles', onTabChange, platform='youtube', page=1, provider=null, subtitleRevision=0 }) {
   const { t } = useI18n()
   const [cues, setCues] = useState([])
   const [subtitleError, setSubtitleError] = useState('')
@@ -202,7 +202,6 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   if (!videoId) return null
   return (
     <section className="pane-video">
-      <p className="pane-label">{t('video.pane')}</p>
       <div className="video-frame">
         {platform === 'youtube' ?
           <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={setTime} /> :
@@ -213,7 +212,16 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
           {overlay.map(line => <span key={line.kind} className={`subtitle-overlay-line ${line.kind}`}>{line.text}</span>)}
         </div>}
       </div>
-      <section className="subtitles-panel" aria-label={t('subtitles.title')}>
+      {/* 播放器在每個分頁都看得到；Bilibili 無法從外部暫停，藏起來聲音會繼續播 */}
+      <div className="result-tabs" role="group" aria-label={t('result.tabs')}>
+        {tabs.map(name => (
+          <button key={name} type="button" aria-pressed={tab === name}
+            className={tab === name ? 'active' : ''} onClick={() => onTabChange(name)}>
+            {t(`result.tab.${name}`)}
+          </button>
+        ))}
+      </div>
+      <section className="subtitles-panel" hidden={tab!=='subtitles'} aria-label={t('subtitles.title')}>
         <div className="subtitles-head">
           <strong>{t('subtitles.title')}</strong>
           <span>{t('subtitles.translationProgress', translatedCount, cues.length)}</span>
@@ -267,7 +275,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
             {filter.trim()&&matched.length>120&&<p className="subtitles-hint">{t('subtitles.moreResults', matched.length)}</p>}
           </>}
       </section>
-      <div className="chapters">
+      <div className="chapters" hidden={tab!=='chapters'}>
         {cards.map((c,i) => (
           <button key={i} className={`chapter ${i===activeIndex?'active':''}`} onClick={()=>onJump(i)}>
             <span className="ts">{c.timestamp_seconds!=null?fmtTime(c.timestamp_seconds):'--:--'}</span>
