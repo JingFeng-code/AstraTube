@@ -18,6 +18,7 @@ import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
 import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
+import { detectSource, needsSubtitleImport, sourceHintKey } from './utils/source-info.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
@@ -26,7 +27,6 @@ const SAVED=(()=>{try{return JSON.parse(localStorage.getItem(SKEY))||{}}catch{re
 // 深視覺開關：獨立存一把 key，跨網址/工作階段延續使用者的偏好
 const DVKEY=DEEP_VISUAL_KEY
 // 頂欄收合狀態：獨立存一把 key，跨工作階段延續使用者的偏好
-const TBKEY='ycr-topbar'
 // 影片欄／重點欄左右比例：獨立存一把 key，跨工作階段延續使用者拖過的比例
 const SPKEY='ycr-split'
 const SPLIT_MIN=20,SPLIT_MAX=80,SPLIT_DEFAULT=50
@@ -67,14 +67,12 @@ function GenerationProgress({ progress }){
 }
 
 export default function App() {
-  const { t, lang, setLang, langs } = useI18n()
+  const { t } = useI18n()
   const [url,setUrl]=useState(SAVED.url||'')
   const [provider,setProvider]=useState(()=>initialAiSource(readPreference('astratube-ai-source'),SAVED.provider))
   const [deepVisual,setDeepVisualRaw]=useState(()=>readPreference(DVKEY)==='1')
   const setDeepVisual=v=>{setDeepVisualRaw(v);try{localStorage.setItem(DVKEY,v?'1':'0')}catch{}}
   // 頂欄收合：只反映使用者手動設定，不受 loading 等程式狀態影響
-  const [topbarCollapsed,setTopbarCollapsedRaw]=useState(()=>readPreference(TBKEY)==='1')
-  const setTopbarCollapsed=v=>{setTopbarCollapsedRaw(v);try{localStorage.setItem(TBKEY,v?'1':'0')}catch{}}
   // 影片／重點欄比例：拖曳中只直接改 DOM 上的 CSS 變數，放開才落到 state
   const [split,setSplitRaw]=useState(loadSplit)
   const workspaceRef=useRef(null)
@@ -155,54 +153,54 @@ export default function App() {
 
   const vc=!notes.vault.configured?{cls:'warn',text:t('vault.notConfigured')}:!notes.vault.exists?{cls:'warn',text:t('vault.missing')}:{cls:'ok',text:t('vault.connected')}
 
+  // 還沒有結果時以網址與開始按鈕為主；開始分析後收成一行，把空間留給影片和卡片
+  const compact=!!result||stream.loading||!!stream.progress
+  const source=detectSource(url)
+  const showSourceHint=!!source&&(!compact||url.trim()!==(result?.source_url||'').trim())
+  const errorNeedsImport=needsSubtitleImport(stream.error)
+  const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
+  const sourceForm=(
+    <section className={`input-row ${compact?'input-row-compact':'input-row-home'}`} aria-label={t('input.section')}>
+      <label className="url-field">
+        <input type="url" placeholder={t('input.placeholder')} aria-label={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
+      </label>
+      <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
+      <div className="input-options">
+        <button className="btn-paper" type="button" onClick={()=>setShowSettings(true)} title={t('ai.choose')}>{t('ai.source')}: {aiSourceLabel(provider,activeProvider,t)}</button>
+        <details className="ai-advanced"><summary>{t('ai.advancedAnalysis')}</summary>
+          <div className="ai-advanced-panel">
+            <label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
+              <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
+              <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
+            </label>
+            {!errorNeedsImport&&subtitleImport}
+          </div>
+        </details>
+      </div>
+    </section>
+  )
+
   return (
     <>
-      {topbarCollapsed ? (
-        <div className="topbar-mini">
-          <BrandMark small/>
-          <span className="topbar-mini-brand">{t('app.name')}</span>
-          <button className="btn-topbar-toggle" onClick={()=>setTopbarCollapsed(false)} title={t('topbar.expandTitle')} aria-label={t('topbar.expandTitle')}>{t('topbar.expand')}</button>
+      <header className={`topbar ${compact?'topbar-compact':''}`}>
+        <div className="brand">
+          <BrandMark/>
+          <div className="brand-copy"><h1>{t('app.name')}</h1></div>
         </div>
-      ) : (
-        <>
-          <header className="topbar">
-            <div className="brand">
-              <BrandMark/>
-              <div className="brand-copy"><h1>{t('app.name')}</h1></div>
-            </div>
-            {notes.vault.configured&&<span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>}
-            <label className="lang-switch" title={t('topbar.language')}>
-              <select value={lang} onChange={e=>setLang(e.target.value)} aria-label={t('topbar.language')}>
-                {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
-              </select>
-            </label>
-            <button className="btn-topbar-toggle" onClick={()=>setTopbarCollapsed(true)} title={t('topbar.collapseTitle')} aria-label={t('topbar.collapseTitle')}>{t('topbar.collapse')}</button>
-            <button className="btn-gear" onClick={()=>setShowSettings(true)}>{t('topbar.settings')}</button>
-          </header>
-          <section className="input-row" aria-label={t('input.section')}>
-            <label className="url-field">
-              <input type="url" placeholder={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
-            </label>
-            <button className="btn-paper" type="button" onClick={()=>setShowSettings(true)} title={t('ai.choose')}>{t('ai.source')}: {aiSourceLabel(provider,activeProvider,t)}</button>
-            <details className="ai-advanced"><summary>{t('ai.advancedAnalysis')}</summary>
-              <label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
-                <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
-                <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
-              </label>
-            </details>
-            <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
-          </section>
-          {visualNotice&&<p className="subtitles-hint" role="status">{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</p>}
-          <SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
-        </>
-      )}
+        {compact&&sourceForm}
+        {notes.vault.configured&&<span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>}
+        <button className="btn-gear" onClick={()=>setShowSettings(true)}>{t('topbar.settings')}</button>
+      </header>
+      {!compact&&sourceForm}
+      {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
+      {visualNotice&&<p className="subtitles-hint" role="status">{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {stream.error&&<p className="error-bar">{stream.error}</p>}
+      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&subtitleImport}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className="workspace" ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>
-        :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p></div>
+        :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p><ol className="empty-steps"><li>{t('empty.step1')}</li><li>{t('empty.step2')}</li><li>{t('empty.step3')}</li></ol></div>
         :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
