@@ -37,6 +37,7 @@ jobs:
           python tests/test_groq_budget.py
           python tests/test_truncated_output.py
           python tests/test_public_errors.py
+          python tests/test_chunker.py
           python tests/test_opencode_errors.py
           python tests/test_free_relay.py
           python tests/test_workflow_diagnostics.py
