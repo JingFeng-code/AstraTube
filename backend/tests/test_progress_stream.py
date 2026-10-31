@@ -44,7 +44,7 @@ def test_stream_progress_uses_real_work_units():
 
         summarize_api._run_segment = fake_run
 
-        response = summarize_api.summarize_stream(SummarizeRequest(url="https://example.com"))
+        response = summarize_api.summarize_stream(SummarizeRequest(url="https://example.com", provider="auto"))
         events = asyncio.run(_events(response))
         assert events[0] == {"type": "progress", "stage": "source", "completed": 0, "total": 0}
         assert events[1]["type"] == "meta" and events[1]["segments"] == 2

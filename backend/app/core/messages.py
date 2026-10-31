@@ -78,8 +78,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Extraction failed: no part produced cards. Try again or switch models.",
     },
     "summarize.model_output_invalid": {
-        "zh-Hant": "模型回應不是有效的知識卡格式（可能只輸出了思考過程、內容被截斷，或模型不支援 JSON 輸出）。請重試，或在開發者模式更換模型。",
-        "en": "The model did not return valid card data (it may have returned only its reasoning, been cut off, or not support JSON output). Try again, or switch models in developer mode.",
+        "zh-Hant": "模型回應不是有效的知識卡格式（可能只輸出了思考過程、內容被截斷，或模型不支援 JSON 輸出）。請重試，或在 AI 來源更換模型。",
+        "en": "The model did not return valid card data (it may have returned only its reasoning, been cut off, or not support JSON output). Try again, or switch models in AI source.",
     },
     "summarize.deepdive_failed": {
         "zh-Hant": "深入解析失敗：{error}",
@@ -300,12 +300,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "{vendor} HTTP {status}: {detail}",
     },
     "provider.hint_auth": {
-        "zh-Hant": "服務拒絕存取：可能需要 API Key、金鑰無效，或目前網路／地區被限制。可在開發者模式改用其他模型或本機 Ollama。",
-        "en": "Access was refused: an API key may be required or invalid, or this network/region is blocked. In developer mode, try another model or local Ollama.",
+        "zh-Hant": "服務拒絕存取：可能需要 API Key、金鑰無效，或目前網路／地區被限制。可在 AI 來源改用其他模型或本機 Ollama。",
+        "en": "Access was refused: an API key may be required or invalid, or this network/region is blocked. In AI source, try another model or local Ollama.",
     },
     "provider.hint_not_found": {
-        "zh-Hant": "模型可能已下架或名稱有誤，請在開發者模式更換模型。",
-        "en": "The model may have been retired or renamed. Pick another model in developer mode.",
+        "zh-Hant": "模型可能已下架或名稱有誤，請在 AI 來源更換模型。",
+        "en": "The model may have been retired or renamed. Pick another model in AI source.",
     },
     "provider.hint_rate_limit": {
         "zh-Hant": "免費額度或請求次數已達上限，請稍等幾分鐘再試，或更換模型。",
@@ -355,9 +355,37 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "Gemini 影片呼叫失敗",
         "en": "The Gemini video call failed",
     },
+    "provider.failed_generic": {
+        "zh-Hant": "模型服務呼叫失敗，請稍後再試或更換模型。",
+        "en": "The model service call failed. Try again later or switch models.",
+    },
+    "provider.bad_response": {
+        "zh-Hant": "{vendor} 回傳了無法使用的內容，請稍後再試或更換模型。",
+        "en": "{vendor} returned something unusable. Try again later or switch models.",
+    },
+    "provider.truncated": {
+        "zh-Hant": "{vendor} 的回覆超過輸出上限，內容被截斷。可以縮短內容或改用額度較高的模型。",
+        "en": "{vendor} hit its output limit and the reply was cut off. Shorten the content or use a model with a higher limit.",
+    },
+    "ask.answer_truncated": {
+        "zh-Hant": "（這則回答超過模型的輸出上限，後面的內容被截斷了。）",
+        "en": "(This answer hit the model's output limit, so the end was cut off.)",
+    },
+    "ask.transcript_trimmed": {
+        "zh-Hant": "（這個模型的額度放不下整份逐字稿，這則回答只參考了影片前段。）",
+        "en": "(This model's limit could not fit the whole transcript, so this answer only uses the first part of the video.)",
+    },
+    "summarize.deepdive_truncated": {
+        "zh-Hant": "（這份解析超過模型的輸出上限，後面的內容被截斷了。）",
+        "en": "(This deep dive hit the model's output limit, so the end was cut off.)",
+    },
+    "llm.no_provider": {
+        "zh-Hant": "尚未選擇可用的 AI，請先到 AI 設定連接 Ollama 或選擇雲端供應商。",
+        "en": "No usable AI is selected. Open AI settings to connect Ollama or choose a cloud provider.",
+    },
     "llm.free_chain_failed": {
-        "zh-Hant": "OpenCode 免費模型目前都無法使用（已試：{models}），請稍後再試；開發者模式也可以改用本地 Ollama。",
-        "en": "No free OpenCode model is available right now (tried: {models}). Try again later, or use local Ollama in developer mode.",
+        "zh-Hant": "OpenCode 免費模型目前都無法使用（已試：{models}），請稍後再試，或到 AI 設定改用本機 Ollama。",
+        "en": "No free OpenCode model is available right now (tried: {models}). Try again later, or switch to local Ollama in AI settings.",
     },
 }
 

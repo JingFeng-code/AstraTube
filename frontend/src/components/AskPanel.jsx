@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ask } from '../api.js'
-import useModels, { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
 import MarkdownText from './MarkdownText.jsx'
 import { useI18n } from '../i18n/index.jsx'
-import { DEFAULT_FREE_PROVIDER } from '../utils/user-mode.js'
-
-// 問答用的模型選擇（與摘要的選擇各自獨立記憶）
-const PKEY = 'ycr-ask-provider'
 
 // 每支影片各自一份對話紀錄，key 依 video_id 區分
 const HKEY_PREFIX = 'ycr-ask-'
@@ -20,22 +15,13 @@ function saveHistory(videoId, history) {
 }
 
 // 「問影片」浮動視窗內容：以當前影片為背景知識的自由聊天室（不是卡片上的 Deep Dive 功能）。
-export default function AskPanel({ videoId, developerMode=false }) {
+export default function AskPanel({ videoId, provider }) {
   const { t } = useI18n()
   const [history, setHistory] = useState(() => loadHistory(videoId))
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [provider, setProviderRaw] = useState(() => {
-    try { return localStorage.getItem(PKEY) || '' } catch { return '' }
-  })
-  const { providers } = useModels()
   const listRef = useRef(null)
-
-  function setProvider(v) {
-    setProviderRaw(v)
-    try { localStorage.setItem(PKEY, v) } catch {}
-  }
 
   // 切換影片：載入該 video_id 對應的歷史紀錄
   useEffect(() => { setHistory(loadHistory(videoId)); setError(null) }, [videoId])
@@ -45,7 +31,7 @@ export default function AskPanel({ videoId, developerMode=false }) {
 
   async function send() {
     const q = input.trim()
-    if (!q || !videoId || loading) return
+    if (!q || !videoId || loading || !provider) return
     setError(null)
     const prevForRequest = history.map(m => ({ role: m.role, content: m.content }))
     const userMsg = { role: 'user', content: q }
@@ -55,7 +41,7 @@ export default function AskPanel({ videoId, developerMode=false }) {
     setInput('')
     setLoading(true)
     try {
-      const res = await ask({ question: q, video_id: videoId, history: prevForRequest, provider: developerMode ? (provider || null) : DEFAULT_FREE_PROVIDER })
+      const res = await ask({ question: q, video_id: videoId, history: prevForRequest, provider })
       const assistantMsg = { role: 'assistant', content: res.answer, model: res.model_used, searched: !!res.searched }
       const withAnswer = [...withUser, assistantMsg]
       setHistory(withAnswer)
@@ -77,22 +63,13 @@ export default function AskPanel({ videoId, developerMode=false }) {
     setError(null)
   }
 
-  const disabled = !videoId || loading
-  const groups = PROVIDER_ORDER.map(k => providers[k] ? { key: k, ...providers[k] } : null).filter(Boolean)
+  const disabled = !videoId || loading || !provider
 
   return (
     <div className="ask-panel ask-chat">
       <div className="ask-chat-head">
         <span className="ask-chat-hint">{videoId ? t('ask.hint') : t('ask.noVideo')}</span>
-        {developerMode && <select className="ask-provider" value={provider} onChange={e => setProvider(e.target.value)}
-                title={t('ask.providerTitle')}>
-          <option value="">{t('ask.auto')}</option>
-          {groups.map(p => (
-            <optgroup key={p.key} label={p.label}>
-              {p.models.map(m => <option key={`${p.key}:${m}`} value={providerValue(p.key, m)}>{m}</option>)}
-            </optgroup>
-          ))}
-        </select>}
+
         <button className="ask-clear" onClick={clearChat} disabled={!videoId || !history.length} title={t('ask.clearTitle')}>{t('ask.clear')}</button>
       </div>
       <div className="ask-chat-list" ref={listRef}>
@@ -116,6 +93,7 @@ export default function AskPanel({ videoId, developerMode=false }) {
           </div>
         )}
       </div>
+      {!provider&&<p className="ask-error">{t('ai.notReady')}</p>}
       {error && <p className="ask-error">{error}</p>}
       <div className="ask-input-row">
         <textarea

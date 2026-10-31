@@ -6,13 +6,13 @@ import { STRINGS } from '../src/i18n/strings.js'
 test('Bilibili 網址一律不送出讀畫面（Issue #19 案例 B）', () => {
   for (const url of ['https://www.bilibili.com/video/BV1WQHP66EPS/?trackid=web', 'https://m.bilibili.com/video/BV1WQHP66EPS', 'https://b23.tv/abc']) {
     assert.equal(isBilibiliUrl(url), true, url)
-    assert.equal(effectiveDeepVisual(true, true, url), false, url)
+    assert.equal(effectiveDeepVisual(true, url), false, url)
   }
   for (const url of ['https://www.youtube.com/watch?v=Y5UobXTOZEY', 'https://bilibili.com.evil.example/video/BV1', 'not a url', '']) {
     assert.equal(isBilibiliUrl(url), false, url)
   }
-  assert.equal(effectiveDeepVisual(true, true, 'https://www.youtube.com/watch?v=Y5UobXTOZEY'), true)
-  assert.equal(effectiveDeepVisual(false, true, 'https://www.youtube.com/watch?v=Y5UobXTOZEY'), false)
+  assert.equal(effectiveDeepVisual(true, 'https://www.youtube.com/watch?v=Y5UobXTOZEY'), true)
+  assert.equal(effectiveDeepVisual(false, 'https://www.youtube.com/watch?v=Y5UobXTOZEY'), false)
 })
 
 test('段落失敗提示會附上真正原因，兩種語言都有新字串', () => {

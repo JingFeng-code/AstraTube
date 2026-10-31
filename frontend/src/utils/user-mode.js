@@ -1,23 +1,16 @@
-// 使用者模式只控制介面可見性，不是 API 授權機制。
-// free：後端只在 OpenCode 免費模型之間接力（單一免費模型會無預警下架），絕不改用付費供應商。
-export const DEFAULT_FREE_PROVIDER = 'free'
-
-export function isDeveloperModeSetting(value) {
-  return value === '1'
-}
-
-export function effectiveProvider(developerMode, selectedProvider) {
-  return developerMode ? (selectedProvider || DEFAULT_FREE_PROVIDER) : DEFAULT_FREE_PROVIDER
-}
-
-// Bilibili 官方網域（與後端 transcript/bilibili.py 的判斷一致）
+// 深視覺屬明確的額外功能，不以開發者身分限制。
 const BILIBILI_HOSTS = new Set(['www.bilibili.com', 'm.bilibili.com', 'bilibili.com', 'b23.tv'])
-
 export function isBilibiliUrl(url) {
   try { return BILIBILI_HOSTS.has(new URL(String(url || '').trim()).hostname.toLowerCase()) } catch { return false }
 }
-
-// 讀畫面（Gemini 深視覺）目前只支援 YouTube；Bilibili 網址一律不送出，後端也會再擋一次。
-export function effectiveDeepVisual(developerMode, enabled, url = '') {
-  return Boolean(developerMode && enabled && !isBilibiliUrl(url))
+export function effectiveDeepVisual(enabled, url = '') {
+  return Boolean(enabled && !isBilibiliUrl(url))
+}
+// 換新鍵：舊鍵 ycr-deep-visual 是開發者模式時期留下的，選項被收進進階分析後使用者看不到，
+// 不能讓它繼續生效，否則選 Ollama 時影片仍可能被送到 Gemini。
+export const DEEP_VISUAL_KEY = 'astratube-deep-visual'
+// 讀畫面實際會發生什麼：'gemini'＝影片會送到 Gemini；'no-key'＝沒有金鑰，只會用字幕；null＝未開啟。
+export function deepVisualNotice(enabled, url, geminiConfigured) {
+  if (!effectiveDeepVisual(enabled, url)) return null
+  return geminiConfigured ? 'gemini' : 'no-key'
 }

@@ -11,6 +11,7 @@ from app.core import access
 from app.api.ask import router as ask_router
 from app.api.implement import router as implement_router
 from app.api.models import router as models_router
+from app.api.provider_connection import router as provider_connection_router
 from app.api.notes import router as notes_router
 from app.api.settings import router as settings_router
 from app.api.subtitles import router as subtitles_router
@@ -52,6 +53,7 @@ app.include_router(summarize_router)
 app.include_router(implement_router)
 app.include_router(ask_router)
 app.include_router(models_router)
+app.include_router(provider_connection_router)
 app.include_router(notes_router)
 app.include_router(settings_router)
 app.include_router(subtitles_router)

@@ -13,10 +13,14 @@ from json_repair import repair_json
 from app.core import config, messages
 from app.core.zh import to_traditional
 from app.llm import router as llm_router
+from app.llm.base import TruncatedOutputError
+from app.llm.budget import summary_budget
+from app.llm.util import user_error
 from app.models.schemas import DeepDiveRequest, SummarizeRequest
 from app.prompts.summarize import (deepdive_prompt, deepdive_system,
-                                   summarize_prompt, summarize_system)
-from app.services.chunker import chunk_content
+                                   summarize_prompt, summarize_system,
+                                   budget_summarize_prompt, budget_summarize_system)
+from app.services.chunker import MAX_CHUNKS, chunk_content
 from app.transcript.router import Content, route_content
 
 router = APIRouter(tags=["summarize"])
@@ -102,15 +106,32 @@ def _parse_cards(raw: str, language: str) -> dict:
 def _allows_cloud_transcription(provider: str | None) -> bool:
     """只有自動模式或明確選 Gemini 時，字幕失敗才可自動改用 Gemini 雲端轉錄。
 
-    一般模式固定送出 OpenCode 免費模型、開發者選 Ollama 時，都不能因為設定裡剛好有
+    選擇 Ollama 或其他指定模型時，都不能因為設定裡剛好有
     Gemini 金鑰，就默默把影片交給雲端並消耗額度。
     """
     kind, _ = llm_router.parse(provider)
     return kind in (llm_router.AUTO, llm_router.GEMINI)
 
 
-def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
-    """擷取內容並切段，回傳 (內容, 片段列表, 是否多段)。"""
+def _split(content: Content, provider: str | None) -> Tuple[list[str], int]:
+    """切段，回傳 (要處理的片段, 超出上限而略過的段數)。
+
+    有額度預算的模型每段都很小，超過段數上限時只處理前段並如實回報，
+    不能把多出來的內容塞進最後一段（那一段會大到必定失敗）。
+    """
+    has_ts = bool(content.get("has_timestamps") or content["type"] == "youtube")
+    profile = summary_budget(provider)
+    if not profile:
+        return chunk_content(content["text"], has_ts), 0
+    chunks = chunk_content(content["text"], has_ts, chunk_chars=profile.chunk_chars,
+                           merge_overflow=False)
+    return chunks[:MAX_CHUNKS], max(0, len(chunks) - MAX_CHUNKS)
+
+
+def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool, int]:
+    """擷取內容並切段，回傳 (內容, 片段列表, 是否多段, 略過的段數)。"""
+    if not llm_router.is_explicit(req.provider):
+        raise HTTPException(400, messages.t("llm.no_provider"))
     try:
         content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))
@@ -119,9 +140,8 @@ def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool]:
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, messages.t("summarize.fetch_failed", error=e))
 
-    has_ts = content.get("has_timestamps") or content["type"] == "youtube"
-    chunks = chunk_content(content["text"], bool(has_ts))
-    return content, chunks, len(chunks) > 1
+    chunks, skipped = _split(content, req.provider)
+    return content, chunks, len(chunks) > 1, skipped
 
 
 _TS_LINE = re.compile(r"^\[(\d+)\]", re.M)
@@ -184,9 +204,13 @@ def _audit_coverage(req: SummarizeRequest, content: Content, chunk: str,
                 if on_status:
                     on_status({**event, "phase": "coverage"})
 
-            raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
-                                             summarize_system(language), seg=index,
-                                             on_status=report)
+            try:
+                raw, label = llm_router.generate(req.provider, summarize_prompt(seg, language),
+                                                 summarize_system(language), seg=index,
+                                                 on_status=report)
+            except TruncatedOutputError as e:
+                # 補做同樣可能撞到輸出上限：留下修得回來的卡片，並告知這段不完整
+                raw, label, data["truncated"] = e.partial, e.label, True
             more = _parse_cards(raw, language)
         except Exception as e:  # noqa: BLE001
             print(f"[summarize] 補做失敗，保留現有卡片：{e}", flush=True)
@@ -209,12 +233,28 @@ def _run_segment(req: SummarizeRequest, content: Content, chunk: str,
     t0 = time.time()
     language = config.get("OUTPUT_LANGUAGE")
     seg: dict[str, Any] = {**content, "text": chunk, "is_segment": multi}
-    raw, model_used = llm_router.generate(req.provider, summarize_prompt(seg, language),
-                                          summarize_system(language), seg=index,
-                                          on_status=on_status)
+    profile = summary_budget(req.provider)
+    prompt = budget_summarize_prompt(seg, language) if profile else summarize_prompt(seg, language)
+    system = budget_summarize_system(language) if profile else summarize_system(language)
+    # 輸出上限只屬於摘要的預算，不影響問答、翻譯與實作
+    limit = {"max_completion_tokens": profile.max_completion_tokens} if profile else {}
+    truncated = False
+    try:
+        raw, model_used = llm_router.generate(req.provider, prompt, system, seg=index,
+                                              on_status=on_status, **limit)
+    except TruncatedOutputError as e:
+        # 半份 JSON 通常還能修復出前面的卡片；留下卡片並告知使用者這段不完整
+        raw, model_used, truncated = e.partial, e.label, True
     t_gen = time.time() - t0
-    data, label = _audit_coverage(req, content, chunk, index, _parse_cards(raw, language),
-                                  model_used, language, on_status=on_status)
+    data = _parse_cards(raw, language)
+    if truncated:
+        data["truncated"] = True
+    # 低額度方案每段已縮短；避免覆蓋率稽核又暗中送出一份大請求。
+    if profile:
+        label = model_used
+    else:
+        data, label = _audit_coverage(req, content, chunk, index, data,
+                                      model_used, language, on_status=on_status)
     print(f"[summarize] 片段 {index + 1} 完成：{len(data.get('cards') or [])} 張卡，"
           f"生成 {t_gen:.1f}s／總計 {time.time() - t0:.1f}s（{label}）", flush=True)
     return data, label
@@ -223,13 +263,13 @@ def _run_segment(req: SummarizeRequest, content: Content, chunk: str,
 @router.post("/summarize")
 def summarize(req: SummarizeRequest) -> dict:
     """一次回傳全部卡片（不串流）。單一片段失敗會跳過，全部失敗才報錯。"""
-    content, chunks, multi = _prepare(req)
+    content, chunks, multi, skipped = _prepare(req)
 
     all_cards: list[dict] = []
     title: str | None = None
     models_used: list[str] = []
     content_types: list[str] = []
-    failed = 0
+    failed = truncated = 0
 
     for i, chunk in enumerate(chunks):
         try:
@@ -240,6 +280,7 @@ def summarize(req: SummarizeRequest) -> dict:
             failed += 1
             print(f"[summarize] 片段 {i + 1}/{len(chunks)} 失敗，已跳過：{e}", flush=True)
             continue
+        truncated += bool(data.get("truncated"))
         if title is None:
             title = data.get("title")
         all_cards.extend(data.get("cards", []))
@@ -258,7 +299,8 @@ def summarize(req: SummarizeRequest) -> dict:
             "transcript_source": content.get("transcript_source"),
             "content_type": _pick_content_type(content_types),
             "cards": all_cards, "model_used": "、".join(models_used),
-            "segments": len(chunks), "failed_segments": failed}
+            "segments": len(chunks), "failed_segments": failed,
+            "truncated_segments": truncated, "skipped_segments": skipped}
 
 
 @router.post("/summarize_stream")
@@ -274,11 +316,15 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
 
     def gen() -> Iterator[str]:
         yield line({"type": "progress", "stage": "source", "completed": 0, "total": 0})
+        # 必須在擷取內容之前檢查：沒選 AI 時不能連影片都先交給 Gemini 轉錄
+        if not llm_router.is_explicit(req.provider):
+            yield line({"type": "fatal", "error": messages.t("llm.no_provider")})
+            return
         try:
             content = route_content(req.url, deep_visual=req.deep_visual,
                                     allow_cloud_fallback=_allows_cloud_transcription(req.provider))
-            has_ts = content.get("has_timestamps") or content["type"] == "youtube"
-            chunks = chunk_content(content["text"], bool(has_ts))
+            profile = summary_budget(req.provider)
+            chunks, skipped = _split(content, req.provider)
         except ValueError as e:
             yield line({"type": "fatal", "error": str(e)})
             return
@@ -288,13 +334,16 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             return
 
         multi = len(chunks) > 1
-        workers = llm_router.parallel_workers(req.provider, len(chunks))
+        workers = profile.workers if profile else llm_router.parallel_workers(req.provider, len(chunks))
         yield line({"type": "meta", "source_type": content["type"], "source_url": req.url,
                     "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
             "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
             "bilibili_page": content.get("bilibili_page"),
                     "transcript_source": content.get("transcript_source"),
                     "segments": len(chunks), "workers": workers})
+        if skipped:
+            yield line({"type": "coverage_limited", "skipped": skipped,
+                        "covered_until": _last_ts(chunks[-1])})
         title: str | None = None
         models_used: list[str] = []
         content_types: list[str] = []   # 依段落順序 append（emit 是嚴格時間序），供多數決
@@ -329,7 +378,7 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 return
             except Exception as e:  # noqa: BLE001
                 failed += 1
-                yield line({"type": "seg_error", "seg": i, "error": str(e)[:200]})
+                yield line({"type": "seg_error", "seg": i, "error": user_error(e, req.provider)})
                 return
             if title is None and data.get("title"):
                 title = data.get("title")
@@ -341,8 +390,11 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             ctype = data.get("content_type") or "other"
             content_types.append(ctype)
             # 每段都帶：前端第一段就能顯示「下一步」入口，done 事件再用多數決校正
-            yield line({"type": "cards", "seg": i, "cards": cards, "model": model_used,
-                        "content_type": ctype})
+            event = {"type": "cards", "seg": i, "cards": cards, "model": model_used,
+                     "content_type": ctype}
+            if data.get("truncated"):
+                event["truncated"] = True
+            yield line(event)
 
         with ThreadPoolExecutor(max_workers=workers) as ex:
             # 第一段優先：不和後段搶免費 API；完成並送到前端後，才平行跑剩餘段落。
@@ -360,7 +412,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
         yield line({"type": "done", "title": title or messages.t("summarize.untitled"),
                     "model_used": "、".join(models_used), "segments": len(chunks),
                     "content_type": _pick_content_type(content_types),
-                    "failed_segments": failed, "total_cards": total})
+                    "failed_segments": failed, "total_cards": total,
+                    "skipped_segments": skipped})
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 
@@ -375,7 +428,11 @@ def deepdive(req: DeepDiveRequest) -> dict:
             deepdive_prompt(req.source_title, req.card.model_dump(), language),
             deepdive_system(language))
         return {"content": to_traditional(text, language), "model_used": model_used}
+    except TruncatedOutputError as e:
+        return {"content": f"{to_traditional(e.partial, language)}\n\n{messages.t('summarize.deepdive_truncated')}",
+                "model_used": e.label}
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, messages.t("summarize.deepdive_failed", error=e))
+        raise HTTPException(500, messages.t("summarize.deepdive_failed",
+                                            error=user_error(e, req.provider)))

@@ -8,7 +8,7 @@
 
 YouTube 影片支援透過官方 IFrame API 對齊播放器時間的字幕閱讀；YouTube 與 Bilibili 均可搜尋公開字幕，點擊文字時間戳跳轉播放器。B 站官方站外播放器沒有同等可靠的公開讀取進度 API，目前僅支援點擊時間跳轉。
 
-字幕工作區支援原文與台灣繁中對照；一般模式可按鈕逐批使用第三方免費模型翻譯，開發者模式也可明確選擇本地 Ollama。免費模型可能限流。原本的摘要及卡片問答功能不受影響。詳情見 [開發路線](docs/ROADMAP.md)。
+字幕工作區支援原文與台灣繁中對照；選定本機 Ollama 或自行設定金鑰的雲端 AI 後，可逐批翻譯字幕。模型供應商、字幕翻譯、摘要及問答共用同一選擇。詳情見 [開發路線](docs/ROADMAP.md)。
 
 參閱 [繁中雙語字幕與快取說明](docs/BILINGUAL_SUBTITLES.zh-TW.md)。
 
@@ -24,15 +24,15 @@ YouTube 影片支援透過官方 IFrame API 對齊播放器時間的字幕閱讀
 
 B 站影片使用官方嵌入播放器，可透過知識卡跳至時間戳；部分影片可能禁止站外播放。沒有公開字幕或需要登入的影片可嘗試匯入自己合法持有的字幕檔，但不會繞過權限或下載影音。B 站深視覺分析、短網址與一次批次分析所有分 P 尚不支援。完整端到端驗收仍待在 Codespaces 操作。
 
-## 一般使用者與開發者模式
+## AI 來源設定（單一設定，不區分使用者模式）
 
-AstraTube 現在預設使用**一般使用者模式**：不需要先設定 API 金鑰，可用公開字幕影片產生知識卡、進行 AI 問答，並將摘錄下載成 Markdown。可用性仍依賴免費模型服務與平台字幕權限。
+在設定選擇「AI 供應商 → 驗證連線 → 選擇模型 → 儲存」。使用者不用一開始就面對一大串模型 ID；需要 API Key 的供應商先驗證憑證，再載入實際可見模型。已存過金鑰則可直接驗證，不須重新輸入。
 
-在「設定」內切換**開發者模式**，即可顯示模型選擇、深視覺、API 金鑰、Obsidian 與 Codex／Claude Code 進階選項。切換僅改變本機介面顯示，並非後端權限控制。完整說明：[使用者模式指南](docs/USER_MODES.zh-TW.md)。
+智慧模式只使用可用的本地 Ollama，不會暗中改用雲端服務；可另選 Gemini、OpenAI、DeepSeek、Anthropic、OpenRouter、Groq、Mistral AI、Together AI 等自備金鑰供應商。已移除不可穩定供第三方程式呼叫的 OpenCode 免費線上選項。完整步驟見 [AI 供應商與模型設定](docs/AI_PROVIDER_SETUP.zh-TW.md)。
 
-## Ollama（開發者模式，先期整合）
+## Ollama（選用的本地 AI）
 
-在同一台電腦啟動 Ollama，於 **設定 → 開發者模式 → Ollama 本地 AI** 設定本機網址及模型。設定畫面會自動列出已安裝的模型供下拉選擇；再從分析畫面的模型選單選擇 `ollama:<模型>`，即可使用本地模型產生摘要、知識卡與影片問答。本功能不需要 API Key，且**不會自動改用付費雲端模型**。目前限定同環境的回環介面 11434 埠；**Codespaces 無法直接連線到你 Windows 電腦的 Ollama**。字幕逐句翻譯在開發者模式也可以選擇已安裝的 Ollama 模型；一般模式依然預設免費線上模型。詳見 [Ollama 開發指南](docs/OLLAMA.zh-TW.md)。
+已安裝 Ollama 的使用者可在 AI 設定選擇「Ollama」，檢查本機服務並選擇已下載的模型。不需要 API Key；摘要、知識卡、問答與字幕翻譯共用所選模型。若本機沒有 Ollama，AstraTube 會顯示未就緒，不會自行呼叫其他雲端 API。內建 llama.cpp 模型自動下載仍尚未實作。
 
 ## Windows 免安裝版 Alpha（測試專用）
 
@@ -48,16 +48,16 @@ Windows 版以**免安裝資料夾**發行：解壓縮後雙擊 `AstraTube.exe` 
    ```
 
 3. 在 **Ports** 面板開啟 **AstraTube Web (15273)** 的轉送網址；保持 Port Visibility 為 **Private**。
-4. 使用有現成字幕的影片測試知識卡與問答。外部免費模型的服務狀態與額度由提供者決定。
+4. 如需知識卡與問答，請先在 AI 設定中選擇可用的供應商（本機 Ollama 或自行提供 API Key）。
 
-第一次執行會下載並安裝 Python/Node 套件；不需要先購買 API 額度。**Codespaces 無法直接使用你個人 Windows 的 Ollama / GPU**。本地運行請參閱 [繁中開發指南](docs/DEVELOPMENT.zh-TW.md)。
+第一次執行會下載並安裝 Python/Node 套件；影片字幕閱讀可不設定雲端金鑰，但使用 AI 生成功能須準備本機 Ollama 或可用的雲端 API Key。**Codespaces 無法直接使用你個人 Windows 的 Ollama / GPU**。本地運行請參閱 [繁中開發指南](docs/DEVELOPMENT.zh-TW.md)。
 
 ## 使用中的開源技術
 
 - **React 18 + Vite**：保留上游 UI；現階段不重寫 Vue / .NET。
 - **FastAPI**：影片字幕來源、知識卡、AI 問答、實作任務、Obsidian。
 - **本地 Whisper**：沿用上游程式，但轉錄可能需要獲授權的音訊來源。
-- **OpenCode Zen / 自備雲端 API / Ollama**：支援免費文字模型、自備模型 API，以及同環境的本地 Ollama。
+- **自備雲端 API / Ollama**：支援多家雲端 AI 供應商與同環境的本地 Ollama；不依賴 OpenCode 免費接力。
 - **GitHub Actions**：上游內建前端建置與後端單元測試。
 
 ## 安全與費用

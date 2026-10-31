@@ -19,8 +19,9 @@ class Card(BaseModel):
 
 class SummarizeRequest(BaseModel):
     url: str
-    # provider："auto"／None＝免費模型優先、失敗才備援到有金鑰的付費供應商；
-    #           "free"＝只在 OpenCode 免費模型之間接力，絕不改用付費供應商（一般模式）；
+    # provider：None／空字串／不認得的字串＝尚未選擇 AI，後端會拒絕；
+    #           "auto"＝免費模型優先、失敗才備援到有金鑰的付費供應商（必須明確指定）；
+    #           "free"＝舊版相容：只在 OpenCode 免費模型之間接力，新介面不會送出；
     #           "gemini"＝只用 gemini-flash-lite-latest；
     #           "opencode:／deepseek:／openai:／anthropic:<model_id>"＝只用該模型
     provider: Optional[str] = None
@@ -82,6 +83,10 @@ class SettingsUpdate(BaseModel):
     deepseek_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    mistral_api_key: Optional[str] = None
+    together_api_key: Optional[str] = None
     ollama_base_url: Optional[str] = None
     ollama_model: Optional[str] = None
     output_language: Optional[str] = None

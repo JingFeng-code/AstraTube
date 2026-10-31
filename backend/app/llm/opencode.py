@@ -9,7 +9,7 @@ import httpx
 
 from app.core import config, messages
 from app.llm.base import EmptyResponseError, ProviderError
-from app.llm.util import connect_error, http_error, with_retry
+from app.llm.util import connect_error, http_error, response_error, safe_finish_reason, with_retry
 
 BASE_URL = "https://opencode.ai/zen/v1"
 DEFAULT_FREE_MODEL = "deepseek-v4-flash-free"
@@ -39,7 +39,7 @@ AUTO_CHAIN: tuple[str, ...] = (
     "nemotron-3-ultra-free",
 )
 
-# 不適合摘要的免費模型（見上方說明）：接力時跳過，只留給使用者在開發者模式手動選
+# 不適合摘要的免費模型（見上方說明）：接力時跳過，只有明確指定模型時才會使用
 _NOT_FOR_RELAY = frozenset({
     "laguna-s-2.1-free", "ling-3.0-flash-free", "ling-3.0-tiny-free", "north-mini-code-free",
 })
@@ -122,13 +122,13 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
     try:
         data = resp.json()
     except Exception:
-        raise ProviderError(messages.t("provider.not_json", vendor="OpenCode",
-                                       detail=resp.text[:200]))
+        raise response_error("OpenCode", messages.t("provider.not_json", vendor="OpenCode",
+                                                    detail=resp.text[:200]))
 
     if isinstance(data, dict) and data.get("error"):
         err = data["error"]
         msg = err.get("message") if isinstance(err, dict) else str(err)
-        raise ProviderError(messages.t("provider.error", vendor="OpenCode", detail=msg))
+        raise response_error("OpenCode", messages.t("provider.error", vendor="OpenCode", detail=msg))
 
     choices = (data or {}).get("choices") or []
     msg = (choices[0].get("message", {}) or {}) if choices else {}
@@ -139,7 +139,7 @@ def _post_chat(model: str, chat_messages: list[dict]) -> str:
     if not text.strip():
         finish = choices[0].get("finish_reason") if choices else None
         raise EmptyResponseError(messages.t("provider.empty_response", vendor="OpenCode",
-                                            reason=f"finish_reason={finish}"))
+                                            reason=f"finish_reason={safe_finish_reason(finish)}"))
     return text
 
 

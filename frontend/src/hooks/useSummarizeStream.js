@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import * as api from '../api.js'
+import { coverageNotice } from '../utils.js'
 
 // 串流生成重點：封裝 NDJSON 事件解析、樂觀顯示與生成進度追蹤。
-export default function useSummarizeStream({ initialResult = null, onSegError, t } = {}) {
+export default function useSummarizeStream({ initialResult = null, onSegError, onSegTruncated, t } = {}) {
   const [result, setResult] = useState(initialResult)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [coverage, setCoverage] = useState(initialResult?.coverage_limit || null)
   const [progress, setProgress] = useState(null)
 
   async function summarize(url, provider, deepVisual=false) {
     const u = url.trim()
     if (!u || loading) return null
     const startedAt = Date.now()
-    setLoading(true); setError(''); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
+    setLoading(true); setError(''); setCoverage(null); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
     const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
     let segsDone = 0
     let firstSegmentError = ''
@@ -25,6 +27,9 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
           draft.bilibili_video_id = ev.bilibili_video_id || null; draft.bilibili_page = ev.bilibili_page || null
           draft.segments = ev.segments; draft.transcript_source = ev.transcript_source || null
           setProgress({ stage: 'generate', state: 'starting', completed: 0, total: ev.segments, startedAt })
+        } else if (ev.type === 'coverage_limited') {
+          draft.coverage_limit = { skipped: ev.skipped, covered_until: ev.covered_until || null }
+          setCoverage(draft.coverage_limit)
         } else if (ev.type === 'segment_status') {
           setProgress(p => ({ ...p, stage: 'generate', state: ev.state, seg: ev.seg,
             provider: ev.provider || p?.provider, model: ev.model || p?.model,
@@ -32,6 +37,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
         } else if (ev.type === 'title') {
           draft.title = ev.title
         } else if (ev.type === 'cards') {
+          if (ev.truncated) onSegTruncated?.(ev)
           segsDone++
           draft.cards = [...draft.cards, ...(ev.cards || [])]
           // 先採用第一個非 other 的段落判定（開場段常判 other），done 事件再用多數決校正
@@ -59,5 +65,5 @@ export default function useSummarizeStream({ initialResult = null, onSegError, t
     return draft
   }
 
-  return { result, setResult, loading, error, progress, summarize }
+  return { result, setResult, loading, error, notice: coverageNotice(coverage, t), progress, summarize }
 }

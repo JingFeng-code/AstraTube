@@ -132,6 +132,12 @@ def test_every_literal_key_in_code_exists():
           f"{len(TRACKS)} 條 track 標籤齊全")
 
 
+def test_messages_do_not_mention_removed_developer_mode():
+    for key, entry in messages.MESSAGES.items():
+        for text in entry.values():
+            assert "開發者模式" not in text and "developer mode" not in text.lower(), key
+
+
 if __name__ == "__main__":
     test_every_key_has_every_language()
     test_english_has_no_cjk_characters()
@@ -139,4 +145,5 @@ if __name__ == "__main__":
     test_t_never_raises()
     test_formatting_substitutes_variables()
     test_every_literal_key_in_code_exists()
+    test_messages_do_not_mention_removed_developer_mode()
     print("\n全部通過。")

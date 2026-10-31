@@ -1,53 +1,132 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as api from '../api.js'
 import { useI18n } from '../i18n/index.jsx'
-import { ollamaModelOptions } from '../utils/ollama-settings.js'
+import { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
+import { aiSourceLabel, resolveAiSource } from '../utils/ai-source.js'
 
-// 每個引擎一列：欄位名 → 標籤／說明／輸入型別
-const ENGINES = [
-  { name: 'gemini',    field: 'gemini_api_key',    multiline: true },
-  { name: 'anthropic', field: 'anthropic_api_key' },
-  { name: 'openai',    field: 'openai_api_key' },
-  { name: 'deepseek',  field: 'deepseek_api_key' },
-  { name: 'opencode',  field: 'opencode_api_key' },
-]
+// 同一頁只處理一個供應商，不再把所有供應商的模型攤平成選單。
+const KEY_FIELDS = {
+  gemini: 'gemini_api_key',
+  openai: 'openai_api_key',
+  deepseek: 'deepseek_api_key',
+  anthropic: 'anthropic_api_key',
+  openrouter: 'openrouter_api_key',
+  groq: 'groq_api_key',
+  mistral: 'mistral_api_key',
+  together: 'together_api_key',
+}
+function sourceParts(value = 'smart') {
+  if (value === 'smart' || value === 'free' || value === 'auto' ||
+      value === 'opencode' || value.startsWith('opencode:')) return { engine: 'smart', model: '' }
+  if (value === 'gemini') return { engine: 'gemini', model: '' } // 舊版 Gemini 無模型後綴
+  const colon = value.indexOf(':')
+  return colon < 1 ? { engine: 'smart', model: '' } :
+    { engine: value.slice(0, colon), model: value.slice(colon + 1) }
+}
 
-// state: 後端 /settings 回傳的公開狀態
-// mandatory: 首次啟動（尚未設定任何金鑰）→ 不可關閉，作為導引畫面
-export default function SettingsModal({ state, mandatory, onClose, onSaved, developerMode=false, onDeveloperModeChange }) {
+export default function SettingsModal({ state, mandatory, onClose, onSaved, provider='smart', providers={}, onProviderChange }) {
   const { t, lang, setLang, langs } = useI18n()
-  const [keys, setKeys] = useState({})   // 只放使用者「這次有輸入」的金鑰
+  const initial = sourceParts(provider)
+  const [engine, setEngine] = useState(initial.engine)
+  const [model, setModel] = useState(initial.model)
+  const [modelSearch, setModelSearch] = useState('')
+  const [keys, setKeys] = useState({})
+  const [connection, setConnection] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const checkVersion = useRef(0)
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
   const [folder, setFolder] = useState(state?.obsidian_notes_folder || 'Youtube Card Reader')
   const [outputLanguage, setOutputLanguage] = useState(state?.output_language || 'zh-Hant')
   const [ollamaUrl, setOllamaUrl] = useState(state?.ollama_base_url || 'http://127.0.0.1:11434')
-  const [ollamaModel, setOllamaModel] = useState(state?.ollama_model || '')
-  const [ollamaStatus, setOllamaStatus] = useState(null)
-  const [checkingOllama, setCheckingOllama] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
   const languages = state?.languages || [{ code: 'zh-Hant', label: '繁體中文' }, { code: 'en', label: 'English' }]
-  const setKey = (field, value) => setKeys(prev => ({ ...prev, [field]: value }))
+  const keyField = KEY_FIELDS[engine]
+  const keySaved = keyField && !!state?.[`${engine}_set`]
+  const typedKey = keyField ? (keys[keyField] || '') : ''
+  const isSmart = engine === 'smart'
+  const verified = !!connection?.connected && connection.provider === engine
+  const available = verified ? connection.models : []
+  const visibleModels = available.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
+  const chosenSource = isSmart ? 'smart' : model ? providerValue(engine, model) : ''
+  const unchangedSource = chosenSource === provider || (provider === 'gemini' && engine === 'gemini' && !model)
+
+  function switchEngine(next) {
+    ++checkVersion.current
+    setEngine(next)
+    setModel(next === initial.engine ? initial.model : '')
+    setConnection(null)
+    setModelSearch('')
+    setChecking(false)
+    setErr('')
+  }
+  function editKey(value) {
+    ++checkVersion.current
+    setKeys(prev => ({ ...prev, [KEY_FIELDS[engine]]: value }))
+    setConnection(null)
+    setChecking(false)
+    setErr('')
+  }
+  function editOllamaUrl(value) {
+    ++checkVersion.current
+    setOllamaUrl(value)
+    setConnection(null)
+    setChecking(false)
+  }
+  async function checkProvider(target = engine, key = typedKey, url = ollamaUrl) {
+    if (target === 'smart') return
+    const version = ++checkVersion.current
+    setChecking(true)
+    setConnection(null)
+    setErr('')
+    try {
+      const result = await api.checkProvider({
+        provider: target,
+        ...(key?.trim() ? { api_key: key.trim() } : {}),
+        ...(target === 'ollama' ? { ollama_base_url: url.trim() } : {}),
+      })
+      if (version !== checkVersion.current) return
+      setConnection(result)
+      setModel(prev => result.models.includes(prev) ? prev : '')
+    } catch (e) {
+      if (version === checkVersion.current) setErr(t('ai.verifyFailed', e.message))
+    } finally {
+      if (version === checkVersion.current) setChecking(false)
+    }
+  }
+
+  // 已設定金鑰不用再輸入；本機 Ollama 可直接檢查連線。
+  // 只檢查目前所選的供應商，不同時向所有雲端服務發出請求。
+  useEffect(() => {
+    if (engine === 'smart' || (KEY_FIELDS[engine] && !state?.[`${engine}_set`])) return
+    if (KEY_FIELDS[engine] && keys[KEY_FIELDS[engine]]?.trim()) return
+    checkProvider(engine, '', ollamaUrl)
+    return () => { ++checkVersion.current }
+  }, [engine, state])
 
   async function handleSave() {
-    if (saving) return
+    if (saving || checking) return
     setErr('')
+    const changing = !unchangedSource
+    const ollamaChanged = engine === 'ollama' && ollamaUrl.trim() !== (state?.ollama_base_url || 'http://127.0.0.1:11434')
+    if (!isSmart && (changing || !!typedKey.trim() || ollamaChanged) &&
+        (!verified || !model || !available.includes(model))) {
+      setErr(t('ai.verifyBeforeSave'))
+      return
+    }
     const payload = {
-      // 金鑰：留空代表「維持原本設定」，只送有輸入的
-      ...(developerMode ? Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])) : {}),
-      // 這些總是送出（清空即代表停用）
-      ...(developerMode ? {
-        obsidian_vault_path: vault.trim(),
-        obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
-        ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
-        ollama_model: ollamaModel.trim(),
-      } : {}),
+      obsidian_vault_path: vault.trim(),
+      obsidian_notes_folder: folder.trim() || 'Youtube Card Reader',
+      ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
       output_language: outputLanguage,
+      // 保留原有金鑰；只在驗證成功且使用者確認儲存時寫入新金鑰。
+      ...(typedKey.trim() && verified ? { [keyField]: typedKey.trim() } : {}),
     }
     setSaving(true)
     try {
       const next = await api.saveSettings(payload)
+      onProviderChange?.(isSmart ? 'smart' : changing ? chosenSource : provider)
       onSaved?.(next)
     } catch (e) {
       setErr(t('settings.saveFailed', e.message))
@@ -55,23 +134,6 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
       setSaving(false)
     }
   }
-
-  async function checkOllama() {
-    setCheckingOllama(true)
-    setOllamaStatus(null)
-    try {
-      setOllamaStatus(await api.getOllamaStatus(ollamaUrl.trim() || 'http://127.0.0.1:11434'))
-    } catch {
-      setOllamaStatus({connected:false,models:[],message:t('settings.ollamaUnavailable')})
-    } finally {
-      setCheckingOllama(false)
-    }
-  }
-
-  // 開發者模式打開設定時自動讀取已安裝模型，不必先按測試
-  useEffect(() => { if (developerMode) checkOllama() }, [developerMode])
-
-  const modelOptions = ollamaModelOptions(ollamaStatus?.models, ollamaModel)
 
   return (
     <div className="settings-overlay" onMouseDown={e => { if (!mandatory && e.target === e.currentTarget) onClose?.() }}>
@@ -83,111 +145,103 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, deve
           </div>
           {!mandatory && <button className="settings-x" onClick={onClose} aria-label={t('settings.close')}>✕</button>}
         </div>
-
         <div className="settings-body">
-          {/* 介面語言擺第一個：外國使用者打開設定，第一件想做的事就是把介面換成看得懂的 */}
           <div className="settings-divider"><span>{t('settings.interface')}</span></div>
           <label className="settings-field">
             <span className="settings-label">{t('settings.uiLanguage')}</span>
-            <select value={lang} onChange={e => setLang(e.target.value)}>
-              {langs.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            <select value={lang} onChange={e=>setLang(e.target.value)}>
+              {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
-            <span className="settings-hint">{t('settings.uiLanguageHint')}</span>
           </label>
 
-          <div className="settings-divider"><span>{t('settings.modeSection')}</span></div>
-          <label className="settings-mode-toggle">
-            <span className="settings-mode-copy">
-              <strong>{t('settings.developerMode')}</strong>
-              <small>{t('settings.developerModeHint')}</small>
-            </span>
-            <input type="checkbox" role="switch" checked={developerMode}
-                   onChange={e => onDeveloperModeChange?.(e.target.checked)}/>
+          <div className="settings-divider"><span>{t('ai.source')}</span></div>
+          <label className="settings-field">
+            <span className="settings-label">{t('ai.chooseProvider')}</span>
+            <select value={engine} onChange={e=>switchEngine(e.target.value)}>
+              <option value="smart">{t('ai.smart')}</option>
+              <optgroup label={t('ai.local')}>
+                <option value="ollama">Ollama</option>
+              </optgroup>
+              <optgroup label={t('ai.cloud')}>
+                {PROVIDER_ORDER.filter(p=>p!=='ollama').map(p=>
+                  <option key={p} value={p}>{providers?.[p]?.label || p}</option>
+                )}
+              </optgroup>
+            </select>
+            {isSmart && <span className="settings-hint">{aiSourceLabel('smart',resolveAiSource('smart',providers),t)} · {t('ai.smartHint')}</span>}
           </label>
+
+          {!isSmart && <>
+            {keyField && <label className="settings-field">
+              <span className="settings-label">{t('ai.apiKey')}</span>
+              <input type="password" autoComplete="off" spellCheck={false}
+                value={typedKey} onChange={e=>editKey(e.target.value)}
+                placeholder={keySaved ? t('settings.keySet', state?.[`${engine}_preview`] || '••••') : t('settings.keyPlaceholder')} />
+              <span className="settings-hint">{keySaved && !typedKey ? t('ai.savedKeyHint') : t('ai.keyHint')}</span>
+            </label>}
+            {engine === 'ollama' && <label className="settings-field">
+              <span className="settings-label">{t('settings.ollamaUrl')}</span>
+              <input type="text" value={ollamaUrl} onChange={e=>editOllamaUrl(e.target.value)}
+                placeholder="http://127.0.0.1:11434" autoComplete="off" spellCheck={false} />
+              <span className="settings-hint">{t('settings.ollamaUrlHint')}</span>
+            </label>}
+            <div className="settings-ollama-check">
+              <button type="button" className="settings-cancel" disabled={checking || saving ||
+                (keyField && !keySaved && !typedKey.trim())} onClick={()=>checkProvider()}>
+                {checking ? t('ai.verifying') : t('ai.verifyConnection')}
+              </button>
+              <p className={verified?'settings-hint':'settings-err'} role="status">
+                {verified ? t('ai.verified', available.length) : checking ? t('ai.verifying') : ''}
+              </p>
+            </div>
+            {verified && <div className="settings-field">
+              <span className="settings-label">{t('ai.chooseModel')}</span>
+              {available.length > 20 && <input type="search" value={modelSearch}
+                onChange={e=>setModelSearch(e.target.value)}
+                placeholder={t('ai.searchModel')} aria-label={t('ai.searchModel')} />}
+              <select value={model} onChange={e=>setModel(e.target.value)} disabled={!available.length}>
+                <option value="">{t('ai.selectModel')}</option>
+                {model && !visibleModels.includes(model) &&
+                  <option value={model}>{model}</option>}
+                {visibleModels.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+              <span className="settings-hint">{available.length ? t('ai.modelsLiveHint') : t('ai.noModels')}</span>
+            </div>}
+          </>}
+          <p className="settings-hint">{t('ai.sharedHint')}</p>
+          <p className="settings-hint">{t('ai.localPlanned')}</p>
 
           <div className="settings-divider"><span>{t('settings.output')}</span></div>
           <label className="settings-field">
             <span className="settings-label">{t('settings.outputLanguage')}</span>
-            <select value={outputLanguage} onChange={e => setOutputLanguage(e.target.value)}>
-              {languages.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            <select value={outputLanguage} onChange={e=>setOutputLanguage(e.target.value)}>
+              {languages.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
-            <span className="settings-hint">{t('settings.outputLanguageHint')}</span>
           </label>
 
-          {developerMode && <>
-          <div className="settings-divider"><span>{t('settings.ollamaSection')}</span></div>
-          <label className="settings-field">
-            <span className="settings-label">{t('settings.ollamaUrl')}</span>
-            <input type="text" value={ollamaUrl} onChange={e=>setOllamaUrl(e.target.value)}
-                   autoComplete="off" spellCheck={false} placeholder="http://127.0.0.1:11434"/>
-            <span className="settings-hint">{t('settings.ollamaUrlHint')}</span>
-          </label>
-          <label className="settings-field">
-            <span className="settings-label">{t('settings.ollamaModel')}</span>
-            <select value={ollamaModel} onChange={e=>setOllamaModel(e.target.value)} disabled={checkingOllama && !ollamaStatus}>
-              {modelOptions.map(option => <option key={option.kind + option.value} value={option.value}>
-                {option.kind === 'auto' ? t('settings.ollamaAuto') : option.kind === 'missing' ? t('settings.ollamaMissing', option.value) : option.value}
-              </option>)}
-            </select>
-            <span className="settings-hint">{ollamaStatus?.connected && !ollamaStatus.models?.length ? t('settings.ollamaNoModels') : t('settings.ollamaModelHint')}</span>
-          </label>
-          <div className="settings-ollama-check">
-            <button type="button" className="settings-cancel" onClick={checkOllama} disabled={checkingOllama}>
-              {checkingOllama?t('settings.ollamaChecking'):t('settings.ollamaRefresh')}
-            </button>
-            {ollamaStatus && <p className={ollamaStatus.connected?'settings-hint':'settings-err'} role="status">
-              {ollamaStatus.message}
-            </p>}
-          </div>
-          <p className="settings-hint">{t('settings.ollamaCheckHint')}</p>
-          <div className="settings-divider"><span>{t('settings.engines')}</span></div>
-          {ENGINES.map(({ name, field, multiline }) => {
-            const already = !!state?.[`${name}_set`]
-            const placeholder = already
-              ? t('settings.keySet', state[`${name}_preview`])
-              : t(name === 'gemini' ? 'settings.geminiPlaceholder'
-                  : name === 'opencode' ? 'settings.opencodePlaceholder'
-                  : 'settings.keyPlaceholder')
-            return (
-              <label className="settings-field" key={field}>
-                <span className="settings-label">{t(`settings.${name}`)}</span>
-                {multiline ? (
-                  <textarea rows={3} autoComplete="off" spellCheck={false} className="settings-keys"
-                            value={keys[field] || ''} onChange={e => setKey(field, e.target.value)}
-                            placeholder={placeholder}/>
-                ) : (
-                  <input type="password" autoComplete="off" spellCheck={false}
-                         value={keys[field] || ''} onChange={e => setKey(field, e.target.value)}
-                         placeholder={placeholder}/>
-                )}
-                <span className="settings-hint">{t(`settings.${name}Hint`)}</span>
-              </label>
-            )
-          })}
+          <details className="settings-advanced">
+            <summary>{t('ai.advancedTools')}</summary>
+            <div className="settings-divider"><span>{t('settings.obsidian')}</span></div>
+            <label className="settings-field">
+              <span className="settings-label">{t('settings.vault')}</span>
+              <input type="text" autoComplete="off" spellCheck={false}
+                value={vault} onChange={e=>setVault(e.target.value)}
+                placeholder={t('settings.vaultPlaceholder')} />
+              <span className="settings-hint">{t('settings.vaultHint')}</span>
+            </label>
+            <label className="settings-field">
+              <span className="settings-label">{t('settings.folder')}</span>
+              <input type="text" autoComplete="off" spellCheck={false}
+                value={folder} onChange={e=>setFolder(e.target.value)}
+                placeholder="Youtube Card Reader" />
+            </label>
+          </details>
 
-          <div className="settings-divider"><span>{t('settings.obsidian')}</span></div>
-          <label className="settings-field">
-            <span className="settings-label">{t('settings.vault')}</span>
-            <input type="text" autoComplete="off" spellCheck={false}
-                   value={vault} onChange={e => setVault(e.target.value)}
-                   placeholder={t('settings.vaultPlaceholder')}/>
-            <span className="settings-hint">{t('settings.vaultHint')}</span>
-          </label>
-          <label className="settings-field">
-            <span className="settings-label">{t('settings.folder')}</span>
-            <input type="text" autoComplete="off" spellCheck={false}
-                   value={folder} onChange={e => setFolder(e.target.value)}
-                   placeholder="Youtube Card Reader"/>
-          </label>
-
-          </>}
-
-          {err && <p className="settings-err">{err}</p>}
+          {err && <p className="settings-err" role="alert">{err}</p>}
         </div>
-
         <div className="settings-foot">
           {!mandatory && <button className="settings-cancel" onClick={onClose} disabled={saving}>{t('settings.cancel')}</button>}
-          <button className="settings-save" onClick={handleSave} disabled={saving}>
+          <button className="settings-save" onClick={handleSave} disabled={saving || checking}>
             {saving ? t('settings.saving') : (mandatory ? t('settings.saveStart') : t('settings.save'))}
           </button>
         </div>

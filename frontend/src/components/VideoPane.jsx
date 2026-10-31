@@ -86,7 +86,7 @@ function YouTubePlayer({ videoId, startAt, onTime }) {
     referrerPolicy="strict-origin-when-cross-origin" />
 }
 
-export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, developerMode=false, localModels=[], subtitleRevision=0 }) {
+export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, platform='youtube', page=1, provider=null, subtitleRevision=0 }) {
   const { t } = useI18n()
   const [cues, setCues] = useState([])
   const [subtitleError, setSubtitleError] = useState('')
@@ -111,12 +111,8 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   const cuesRef = useRef([])
   const activeRef = useRef(-1)
   const runningRef = useRef(false)
-  const [developerTranslation, setDeveloperTranslation] = useState('opencode')
-  // 回到一般模式就只使用免費模型；本地模型若不存在也退回預設，
-  // 切換模式時不刪掉開發者上次選擇。
-  const translationProvider = effectiveSubtitleTranslationProvider(
-    developerMode, developerTranslation, localModels
-  )
+  // 字幕翻譯預設和摘要、問答共用 AI；沒有 AI 時只讀字幕、不啟動翻譯。
+  const translationProvider = effectiveSubtitleTranslationProvider(provider)
   const sourceGeneration = useRef(0)
 
   useEffect(() => {
@@ -155,9 +151,9 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   useEffect(() => () => { runningRef.current = false }, [])
 
   // 整片翻譯：一次一批（最多 16 句）依序送出，從目前播放位置往後優先。
-  // 一般模式只用免費模型；失敗就停下並顯示原因，按「繼續翻譯」從未完成處接續（已翻譯的有快取）。
+  // 只用使用者選定的 AI；失敗就停下並顯示原因，按「繼續翻譯」從未完成處接續（已翻譯的有快取）。
   async function translateAll() {
-    if (runningRef.current || !cuesRef.current.length) return
+    if (runningRef.current || !cuesRef.current.length || !provider) return
     const generation = sourceGeneration.current
     runningRef.current = true
     setTranslating(true)
@@ -225,22 +221,14 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
         {subtitleSource === 'imported' && <p className="subtitles-hint">
           {t('subtitles.importedTiming', subtitleTiming === 'milliseconds_original')}
         </p>}
-        {developerMode && <label className="subtitles-provider">
-          <span>{t('subtitles.engine')}</span>
-          <select value={translationProvider} onChange={e => setDeveloperTranslation(e.target.value)}
-                  aria-label={t('subtitles.engine')}>
-            <option value="opencode">{t('subtitles.freeEngine')}</option>
-            {localModels.map(model => <option key={model} value={`ollama:${model}`}>Ollama · {model}</option>)}
-          </select>
-          {!localModels.length && <small>{t('subtitles.noLocalModels')}</small>}
-        </label>}
+        <p className="subtitles-hint">{t('ai.sharedSource')}{provider ? ` · ${provider}` : ` · ${t('ai.setupRequired')}`}</p>
         {!loading && !subtitleError && cues.length>0 && <div className="subtitles-controls">
           {translating ?
             <button className="btn-paper" onClick={pauseTranslation}>
               {t(translationProvider.startsWith('ollama:') ? 'subtitles.translatingAllLocal' : 'subtitles.translatingAll', translatedCount, cues.length)}
               {' · '}{t('subtitles.pause')}
             </button> :
-            <button className="btn-paper" onClick={translateAll} disabled={allTranslated}>
+            <button className="btn-paper" onClick={translateAll} disabled={allTranslated||!provider}>
               {allTranslated ? t('subtitles.translateDone') :
                 translatedCount > 0 ? t('subtitles.translateResume', cues.length - translatedCount) : t('subtitles.translateAll', cues.length)}
             </button>}

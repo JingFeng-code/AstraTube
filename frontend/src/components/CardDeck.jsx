@@ -6,7 +6,7 @@ import { useI18n } from '../i18n/index.jsx'
 // 重點數量多時把導覽縮小排密，避免撐破標題列
 const COMPACT_FROM = 24
 
-export default function CardDeck({ result, index, setIndex, clippedIds, onClip, onJumpVideo, deepdives, onDeepDive, deepdiveLoading, onImplement, fullWidth, developerMode=false }) {
+export default function CardDeck({ result, index, setIndex, clippedIds, onClip, onJumpVideo, deepdives, onDeepDive, deepdiveLoading, onImplement, fullWidth }) {
   const { t } = useI18n()
   const cards=result.cards||[], card=cards[index]
   const dotsRef=useRef(null)
@@ -27,11 +27,11 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
     <section className={`deck ${fullWidth?'deck-full':''}`}>
       <div className="deck-head">
         <h2 className="deck-title">{result.title}</h2>
-        {developerMode&&result.model_used&&<span className="model-badge" title={t('deck.modelTitle')}>{result.model_used}{result.segments>1?t('deck.segments',result.segments):''}</span>}
-        {developerMode&&sourceKey&&<span className="model-badge" title={t('deck.sourceTitle')}>{t(sourceKey)}</span>}
+        {result.model_used&&<span className="model-badge" title={t('deck.modelTitle')}>{result.model_used}{result.segments>1?t('deck.segments',result.segments):''}</span>}
+        {sourceKey&&<span className="model-badge" title={t('deck.sourceTitle')}>{t(sourceKey)}</span>}
         <span className="deck-count">{t('deck.count',index+1,cards.length)}</span>
         {/* 實作的對象是整支影片，不是單張卡——所以按鈕在標題列，不在卡片上 */}
-        {developerMode&&<button className="btn-implement" onClick={onImplement} title={t('implement.ctaTitle')}>{t(`implement.cta.${suggestedTrack}`)}</button>}
+        <details className="deck-advanced"><summary>{t('ai.advancedTools')}</summary><button className="btn-implement" onClick={onImplement} title={t('implement.ctaTitle')}>{t(`implement.cta.${suggestedTrack}`)}</button></details>
       </div>
       {/* 重點導覽常駐頂部，不必捲到底才能切換 */}
       <div className="deck-nav deck-nav-top">

@@ -18,12 +18,31 @@ class RefusalError(RuntimeError):
     """
 
 
+class TruncatedOutputError(ProviderError):
+    """模型回覆超過輸出上限被截斷（各家欄位不同，例如 finish_reason=length、stop_reason=max_tokens）。
+    重試同一份請求結果相同，所以不算暫時性。
+
+    預設會失敗，避免把半份內容當成完整結果（例如存進翻譯快取）；
+    能接受部分內容的呼叫端可以接住它，改用 partial 並明確告知使用者。
+    """
+
+    def __init__(self, message: str, partial: str, label: str):
+        super().__init__(message)
+        self.public_message = message
+        self.partial = partial
+        self.label = label
+
+
 class KeyExhaustedError(ProviderError):
     """這把金鑰用不了（額度耗盡或無效）——呼叫端應換下一把繼續，而非重頭來過。"""
 
 
 class EmptyResponseError(ProviderError):
     """模型回了 200 但內容是空的（reasoning 模型常見）——屬暫時性，值得重試。"""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.public_message = message  # 訊息只含供應商名稱與過濾後的結束原因，可以顯示
 
 
 class LLMProvider(Protocol):

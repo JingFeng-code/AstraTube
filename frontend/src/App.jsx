@@ -9,26 +9,26 @@ import FloatingPanel from './components/FloatingPanel.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
 import ImplementModal from './components/ImplementModal.jsx'
 import BrandMark from './components/BrandMark.jsx'
-import useModels, { PROVIDER_ORDER, providerValue } from './hooks/useModels.js'
+import useModels from './hooks/useModels.js'
+import { initialAiSource, resolveAiSource, aiSourceLabel } from './utils/ai-source.js'
 import useSettings from './hooks/useSettings.js'
 import useSummarizeStream from './hooks/useSummarizeStream.js'
 import useImplement from './hooks/useImplement.js'
 import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
-import { DEFAULT_FREE_PROVIDER, isDeveloperModeSetting, effectiveProvider, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
+import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
 const SAVED=(()=>{try{return JSON.parse(localStorage.getItem(SKEY))||{}}catch{return {}}})()
 // 深視覺開關：獨立存一把 key，跨網址/工作階段延續使用者的偏好
-const DVKEY='ycr-deep-visual'
+const DVKEY=DEEP_VISUAL_KEY
 // 頂欄收合狀態：獨立存一把 key，跨工作階段延續使用者的偏好
 const TBKEY='ycr-topbar'
 // 影片欄／重點欄左右比例：獨立存一把 key，跨工作階段延續使用者拖過的比例
 const SPKEY='ycr-split'
-const DEVKEY='astratube-developer-mode'
 const SPLIT_MIN=20,SPLIT_MAX=80,SPLIT_DEFAULT=50
 function readPreference(key){try{return localStorage.getItem(key)}catch{return null}}
 function loadSplit(){try{const v=parseFloat(readPreference(SPKEY));return isFinite(v)&&v>=SPLIT_MIN&&v<=SPLIT_MAX?v:SPLIT_DEFAULT}catch{return SPLIT_DEFAULT}}
@@ -54,6 +54,7 @@ function GenerationProgress({ progress }){
   let label=t('progress.generate')
   if(progress.stage==='source') label=t('progress.source')
   else if(progress.phase==='coverage') label=t('progress.coverage',seg,model)
+  else if(progress.state==='rate_wait') label=t('progress.rateWait',seg,apiName,progress.delay||0)
   else if(progress.state==='retry_wait') label=t('progress.retry',seg,apiName,progress.delay||0,progress.attempt||'',progress.tries||'')
   else if(progress.state==='model_switch') label=t('progress.modelSwitch',seg,progress.model)
   else if(progress.state==='key_switch') label=t('progress.keySwitch',seg)
@@ -68,10 +69,7 @@ function GenerationProgress({ progress }){
 export default function App() {
   const { t, lang, setLang, langs } = useI18n()
   const [url,setUrl]=useState(SAVED.url||'')
-  const [provider,setProvider]=useState(SAVED.provider||DEFAULT_FREE_PROVIDER)
-  const [developerMode,setDeveloperModeRaw]=useState(()=>isDeveloperModeSetting(readPreference(DEVKEY)))
-  const setDeveloperMode=enabled=>{setDeveloperModeRaw(enabled);try{localStorage.setItem(DEVKEY,enabled?'1':'0')}catch{}}
-  const activeProvider=effectiveProvider(developerMode,provider)
+  const [provider,setProvider]=useState(()=>initialAiSource(readPreference('astratube-ai-source'),SAVED.provider))
   const [deepVisual,setDeepVisualRaw]=useState(()=>readPreference(DVKEY)==='1')
   const setDeepVisual=v=>{setDeepVisualRaw(v);try{localStorage.setItem(DVKEY,v?'1':'0')}catch{}}
   // 頂欄收合：只反映使用者手動設定，不受 loading 等程式狀態影響
@@ -90,10 +88,13 @@ export default function App() {
   const showToast=(msg,isErr=false)=>{clearTimeout(toastTimer.current);setToast({msg,isErr});toastTimer.current=setTimeout(()=>setToast(null),4200)}
 
   const { providers, refresh: refreshModels } = useModels()
+  const activeProvider=resolveAiSource(provider,providers)
+  const setAiSource=next=>{setProvider(next);try{localStorage.setItem('astratube-ai-source',next)}catch{}}
   const { settings, needsSetup, setSettings } = useSettings()
   const stream = useSummarizeStream({
     initialResult: SAVED.result||null,
     onSegError: ev=>showToast(t('toast.segFailed',ev.seg+1,typeof ev.error==='string'?ev.error.trim().slice(0,160):''),true),
+    onSegTruncated: ev=>showToast(t('toast.segTruncated',ev.seg+1),true),
     t,
   })
   const { result } = stream
@@ -118,16 +119,18 @@ export default function App() {
 
   // Bilibili 不支援讀畫面：停用勾選框並說明原因（不改動使用者對 YouTube 的偏好設定）
   const bilibiliUrl=isBilibiliUrl(url)
+  const visualNotice=deepVisualNotice(deepVisual,url,!!providers?.gemini?.configured)
   const cards=result?.cards||[]
   const isBilibili=result?.source_type==='bilibili'&&!!result?.bilibili_video_id
   const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili
 
   async function handleSummarize(){
+    if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}
     cardsHook.resetForNewResult()
-    await stream.summarize(url,activeProvider,effectiveDeepVisual(developerMode,deepVisual,url))
+    await stream.summarize(url,activeProvider,effectiveDeepVisual(deepVisual,url))
   }
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
-  async function onDeepDive(i){try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
+  async function onDeepDive(i){if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
   async function handleSave(){
     try{
       const res=await notes.save({title:filename||result?.title||t('note.summary'),sourceUrl:result?.source_url||url,clips:cardsHook.clips,freeNote,t})
@@ -152,9 +155,6 @@ export default function App() {
 
   const vc=!notes.vault.configured?{cls:'warn',text:t('vault.notConfigured')}:!notes.vault.exists?{cls:'warn',text:t('vault.missing')}:{cls:'ok',text:t('vault.connected')}
 
-  // 供應商下拉：沒填金鑰的付費供應商仍然列出（標註需填金鑰），使用者才知道有這個選項
-  const providerGroups=PROVIDER_ORDER.map(key=>providers[key]?{key,...providers[key]}:null).filter(Boolean)
-
   return (
     <>
       {topbarCollapsed ? (
@@ -170,7 +170,7 @@ export default function App() {
               <BrandMark/>
               <div className="brand-copy"><h1>{t('app.name')}</h1></div>
             </div>
-            {developerMode&&<span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>}
+            {notes.vault.configured&&<span className={`vault-chip ${vc.cls}`}><span className="dot"/> {vc.text}</span>}
             <label className="lang-switch" title={t('topbar.language')}>
               <select value={lang} onChange={e=>setLang(e.target.value)} aria-label={t('topbar.language')}>
                 {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
@@ -179,50 +179,44 @@ export default function App() {
             <button className="btn-topbar-toggle" onClick={()=>setTopbarCollapsed(true)} title={t('topbar.collapseTitle')} aria-label={t('topbar.collapseTitle')}>{t('topbar.collapse')}</button>
             <button className="btn-gear" onClick={()=>setShowSettings(true)}>{t('topbar.settings')}</button>
           </header>
-          <section className={`input-row ${!developerMode?'input-row-simple':''}`} aria-label={t('input.section')}>
+          <section className="input-row" aria-label={t('input.section')}>
             <label className="url-field">
               <input type="url" placeholder={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
             </label>
-            {developerMode&&<label className="model-field">
-              <select value={provider} onChange={e=>setProvider(e.target.value)}>
-                <option value="auto">{t('input.auto')}</option>
-                <option value="free">{t('input.freeOnly')}</option>
-                {providerGroups.map(p=>(
-                  <optgroup key={p.key} label={`${p.label}${p.free?'':p.configured?'':` — ${t('input.needsKey')}`}`}>
-                    {p.models.map(id=><option key={`${p.key}:${id}`} value={providerValue(p.key,id)}>{id}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </label>}
-            {developerMode&&<label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
-              <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
-              <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
-            </label>}
+            <button className="btn-paper" type="button" onClick={()=>setShowSettings(true)} title={t('ai.choose')}>{t('ai.source')}: {aiSourceLabel(provider,activeProvider,t)}</button>
+            <details className="ai-advanced"><summary>{t('ai.advancedAnalysis')}</summary>
+              <label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
+                <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
+                <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
+              </label>
+            </details>
             <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
           </section>
+          {visualNotice&&<p className="subtitles-hint" role="status">{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</p>}
           <SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
         </>
       )}
       <GenerationProgress progress={stream.progress}/>
       {stream.error&&<p className="error-bar">{stream.error}</p>}
+      {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className="workspace" ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>
         :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p></div>
-        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} developerMode={developerMode} localModels={providers?.ollama?.models||[]} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} developerMode={developerMode}/></>}
+        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
       {result&&<>
         <FloatingPanel id="notes" corner="br" title={t('panel.notes')} icon="NOTE" badge={cardsHook.clips.length||null}>
-          <NotesPanel developerMode={developerMode} onExport={handleExportNotes} vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
+          <NotesPanel onExport={handleExportNotes} vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
         </FloatingPanel>
         <FloatingPanel id="ask" corner="bl" title={t('panel.ask')} icon="AI">
-          <AskPanel developerMode={developerMode} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
+          <AskPanel provider={activeProvider} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
         </FloatingPanel>
       </>}
-      {developerMode&&implement.open&&<ImplementModal state={implement} providers={providers} onClose={implement.close} onToast={showToast}/>}
+      {implement.open&&<ImplementModal state={implement} providers={providers} onClose={implement.close} onToast={showToast}/>}
       {toast&&<div className={`toast ${toast.isErr?'err':''}`}>{toast.msg}</div>}
-      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} developerMode={developerMode} onDeveloperModeChange={setDeveloperMode} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
+      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
     </>
   )
 }

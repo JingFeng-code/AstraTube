@@ -11,8 +11,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.core import config
-from app.llm.base import ProviderError
+from app.core import config, messages
+from app.llm.base import ProviderError, TruncatedOutputError
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$")
@@ -118,6 +118,17 @@ def context_size(payload_messages: list[dict]) -> int:
     return max(_MIN_CTX, min(_MAX_CTX, size))
 
 
+def _check_truncated(done_reason: object, content: str, name: str) -> None:
+    """done_reason=length 代表撞到輸出或上下文上限。獨立成函式：generate_messages 的參數遮蔽了 messages 模組。"""
+    if done_reason != "length":
+        return
+    message = messages.t("provider.truncated", vendor="Ollama")
+    if not content:
+        # 沒有部分內容可留，但仍要說出真正的原因，不要叫使用者去檢查模型是否支援對話
+        raise ProviderError(message)
+    raise TruncatedOutputError(message, partial=content, label=f"Ollama/{name}")
+
+
 def generate_messages(messages: list[dict], system: str = "", model: str = "",
                       tries: int = 1, on_status=None) -> tuple[str, str]:
     """串流呼叫 /api/chat 並組回完整文字。local-only，指定 Ollama 不會默默轉到雲端。"""
@@ -129,6 +140,7 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
                "options": {"num_ctx": context_size(payload_messages)}}
     parts: list[str] = []
     finished = False
+    done_reason = None
     try:
         with httpx.Client(timeout=_TIMEOUT, trust_env=False, follow_redirects=False) as client:
             with client.stream("POST", base_url() + "/api/chat", json=payload) as response:
@@ -148,6 +160,7 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
                         parts.append(piece)
                     if chunk.get("done"):
                         finished = True
+                        done_reason = chunk.get("done_reason")
                         break
     except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
         raise ProviderError("無法連線 Ollama，請檢查本機服務是否啟動。") from exc
@@ -162,6 +175,7 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
         # 連線正常結束但沒收到 done：回答被中斷（例如 Ollama 中途卸載模型），不能當成完整答案
         raise ProviderError("Ollama 回答到一半就中斷了，請再試一次；若一直發生，請換用較小的本機模型。")
     content = "".join(parts).strip()
+    _check_truncated(done_reason, content, name)
     if not content:
         raise ProviderError("Ollama 沒有回傳文字內容，請檢查模型是否支援文字對話。")
     return content, f"Ollama/{name}"
