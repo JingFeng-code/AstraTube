@@ -22,6 +22,7 @@ import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } fro
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
 import { isVideoFile, localVideoId, localVideoUrl } from './utils/local-video.js'
+import LocalSpeechControls from './components/LocalSpeechControls.jsx'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
@@ -146,7 +147,7 @@ export default function App() {
     if(!isVideoFile(file)){showToast(t('local.invalidFile'),true);return}
     try{
       const id=await localVideoId(file)
-      setLocalVideo(previous=>{if(previous?.src)URL.revokeObjectURL(previous.src);return{id,name:file.name,src:URL.createObjectURL(file)}})
+      setLocalVideo(previous=>{if(previous?.src)URL.revokeObjectURL(previous.src);return{id,name:file.name,src:URL.createObjectURL(file),file}})
       setSourceMode('local')
     }catch{showToast(t('local.invalidFile'),true)}
   }
@@ -240,7 +241,7 @@ export default function App() {
       {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
       {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {isLocalMode&&localVideo&&!result&&<div className="local-subtitle-row"><SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')}/></div>}
+      {isLocalMode&&localVideo&&!result&&!stream.loading&&!stream.progress&&<div className="local-subtitle-row"><SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')} refreshKey={subtitleRevision}/><LocalSpeechControls key={`speech-${localVideo.id}`} file={localVideo.file} videoId={localVideo.id} onDone={()=>setSubtitleRevision(v=>v+1)}/></div>}
       {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}

@@ -1,5 +1,6 @@
 # Smaller desktop-alpha backend profile. The optional heavy Whisper/yt-dlp
 # transcription pipeline is deliberately NOT bundled in this first installer.
+# Local video speech-to-text uses sherpa-onnx; its model is downloaded on request.
 fastapi>=0.115.0
 uvicorn>=0.34.0
 python-dotenv>=1.0.1
@@ -11,3 +12,5 @@ anthropic>=0.69.0
 httpx>=0.27.0
 json-repair>=0.30.0
 opencc-python-reimplemented
+av>=11,<16
+sherpa-onnx>=1.12,<2

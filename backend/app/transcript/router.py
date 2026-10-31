@@ -25,7 +25,7 @@ class Content(TypedDict):
     is_chinese: bool
     has_timestamps: bool
     bilibili_page: Optional[int]  # Bilibili 分 P，其他來源為 None
-    transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper；文章為 None
+    transcript_source: Optional[str]  # deepsrt / deepsrt+captions / captions / whisper / local_speech；文章為 None
 
 
 def _fetch_captions(video_id: str,
@@ -115,9 +115,10 @@ def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: boo
             raise ValueError("本地影片不支援讀畫面，請關閉後重試。")
         uploaded = imported_subtitles.load("local", local_id)
         if not uploaded:
-            raise ValueError("這支本地影片還沒有字幕，請先匯入 SRT／VTT 字幕檔。")
+            raise ValueError("這支本地影片還沒有字幕，請先匯入 SRT／VTT 字幕檔，或使用本機語音轉文字。")
         return _pack("local", local_id, imported_subtitles.transcript_from_cues(uploaded["cues"]),
-                     uploaded["is_chinese"], "imported_subtitles")
+                     uploaded["is_chinese"],
+                     "local_speech" if uploaded.get("format") == "asr" else "imported_subtitles")
 
     bili = bilibili.parse_video_url(url)
     if bili:

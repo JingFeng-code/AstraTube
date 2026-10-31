@@ -497,6 +497,9 @@ button:disabled{cursor:not-allowed}
 .local-file-name{min-width:0;overflow:hidden;color:var(--text-soft);font-size:14px;text-overflow:ellipsis;white-space:nowrap}
 .local-subtitle-row{width:min(100%,860px);margin:10px auto 0;padding:0 16px}
 .local-subtitle-row .subtitle-import-bar{padding:0}
+.local-speech{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:13px}
+.local-speech button{min-height:32px;font-size:13px}
+.local-speech-hint{flex-basis:100%;margin:0;color:var(--text-faint);font-size:13px;line-height:1.5}
 .local-player{display:block;width:100%;height:100%;background:#000}
 .local-player-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;padding:16px;color:#e9e9e9;font-size:13px;line-height:1.5;text-align:center}
 .local-player-empty p{margin:0}

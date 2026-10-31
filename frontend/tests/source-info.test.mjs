@@ -45,7 +45,7 @@ test('本地影片入口：只存識別碼，檔案不離開這台電腦', () =>
   const app = read('../src/App.jsx')
   assert.match(app, /URL\.createObjectURL\(file\)/)
   assert.match(app, /localVideo:localVideo\?\{id:localVideo\.id,name:localVideo\.name\}:null/)
-  assert.ok(STRINGS.zh['input.sourceLocal'].includes('不會上傳'))
+  assert.ok(STRINGS.zh['input.sourceLocal'].includes('只在這台電腦'))
   assert.equal(sourceHintKey('local'), 'input.sourceLocal')
   const conf = readFileSync(new URL('../../desktop/src-tauri/tauri.conf.json', import.meta.url), 'utf8')
   assert.match(conf, /media-src blob:;/)

@@ -5,7 +5,7 @@ import { useI18n } from '../i18n/index.jsx'
 const MAX_FILE_SIZE = 1024 * 1024
 
 // onAnalyze 只在分析失敗後的錯誤區傳入：匯入完可以直接開始，不必再回頭找「開始」按鈕
-export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze, noFileHint }) {
+export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze, noFileHint, refreshKey }) {
   const { t } = useI18n()
   const inputRef = useRef(null)
   const [state, setState] = useState(null)
@@ -28,7 +28,7 @@ export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze,
       })
     }, 400)
     return () => { alive = false; clearTimeout(timer) }
-  }, [videoUrl, revision])
+  }, [videoUrl, revision, refreshKey])
 
   async function selected(event) {
     const file = event.target.files?.[0]
@@ -83,7 +83,7 @@ export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze,
       {state?.exists && <button type="button" className="btn-paper"
           disabled={busy} onClick={remove}>{t('subtitles.removeAction')}</button>}
       {state?.exists && <span className="import-status">
-        {t('subtitles.importPresent',state.format,state.cue_count)}
+        {state.format === 'asr' ? t('local.speechPresent', state.cue_count) : t('subtitles.importPresent',state.format,state.cue_count)}
       </span>}
       {message && <span className="import-status" role="status">{message}</span>}
       {error && <span className="import-error" role="alert">{error}</span>}

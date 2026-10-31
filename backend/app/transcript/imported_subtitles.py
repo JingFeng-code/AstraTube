@@ -149,6 +149,11 @@ def transcript_from_cues(cues: list[dict]) -> str:
 
 def save(platform: str, video_id: str, page: int, filename: str, content: str) -> dict:
     fmt, cues = parse_subtitle_file(filename, content)
+    return save_cues(platform, video_id, page, fmt, cues)
+
+
+def save_cues(platform: str, video_id: str, page: int, fmt: str, cues: list[dict]) -> dict:
+    """fmt 是 srt／vtt，本機語音轉文字產生的字幕則是 asr。"""
     path = _file_path(platform, video_id, page)
     # 只根據字幕內容猜測；不會將全部原文強制簡繁轉換。
     total = sum(len(cue["text"]) for cue in cues)
