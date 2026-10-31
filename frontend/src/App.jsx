@@ -207,10 +207,10 @@ export default function App() {
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
       {result&&<>
-        <FloatingPanel id="notes" corner="br" title={t('panel.notes')} icon="NOTE" badge={cardsHook.clips.length||null}>
+        <FloatingPanel id="notes" corner="br" title={t('panel.notes')} badge={cardsHook.clips.length||null}>
           <NotesPanel onExport={handleExportNotes} vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
         </FloatingPanel>
-        <FloatingPanel id="ask" corner="bl" title={t('panel.ask')} icon="AI">
+        <FloatingPanel id="ask" corner="bl" title={t('panel.ask')}>
           <AskPanel provider={activeProvider} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
         </FloatingPanel>
       </>}

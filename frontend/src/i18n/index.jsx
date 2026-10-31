@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { LANGS, STRINGS } from './strings.js'
 
 const KEY = 'ycr-ui-lang'
@@ -22,6 +22,11 @@ const I18nContext = createContext(null)
 export function I18nProvider({ children }) {
   const [lang, setLangRaw] = useState(detect)
 
+  // 頁面語系跟著介面語言，啟動時也要同步（螢幕閱讀器與瀏覽器翻譯會參考它）
+  useEffect(() => {
+    try { document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : lang } catch {}
+  }, [lang])
+
   const value = useMemo(() => {
     const dict = STRINGS[lang] || STRINGS[FALLBACK]
     // t(key, ...args)：值是函式就當模板呼叫，否則直接回字串。
@@ -34,7 +39,6 @@ export function I18nProvider({ children }) {
     const setLang = (next) => {
       setLangRaw(next)
       try { localStorage.setItem(KEY, next) } catch {}
-      try { document.documentElement.lang = next === 'zh' ? 'zh-Hant' : next } catch {}
     }
     return { lang, setLang, t, langs: LANGS }
   }, [lang])
