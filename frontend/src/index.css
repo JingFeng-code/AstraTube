@@ -505,7 +505,10 @@ button:disabled{cursor:not-allowed}
   .topbar-compact{flex-wrap:wrap}
   .topbar-compact .input-row-compact{order:3;flex-basis:100%;grid-template-columns:minmax(0,1fr) auto}
   .input-row-compact .input-options{grid-column:1/-1;grid-row:2;flex-wrap:wrap}
-  .input-row-compact .ai-advanced-panel{left:0;right:auto}
+  /* 面板改對齊整列選項，不跟著按鈕位置往右推，才不會超出手機畫面 */
+  .input-options{position:relative}
+  .ai-advanced[open]{position:static}
+  .ai-advanced-panel,.input-row-compact .ai-advanced-panel{left:0;right:0;width:auto}
 }
 @media(max-width:480px){
   .input-row.input-row-home{grid-template-columns:minmax(0,1fr)}

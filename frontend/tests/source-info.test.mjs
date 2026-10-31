@@ -41,6 +41,12 @@ test('只有請使用者匯入字幕的錯誤才顯示匯入按鈕', () => {
   assert.equal(needsSubtitleImport(''), false)
 })
 
+test('窄螢幕的分析選項面板對齊整列，不會超出畫面', () => {
+  const css = read('../src/index.css')
+  assert.match(css, /\.input-options\{position:relative\}\s*\.ai-advanced\[open\]\{position:static\}/)
+  assert.match(css, /\.ai-advanced-panel,\.input-row-compact \.ai-advanced-panel\{left:0;right:0;width:auto\}/)
+})
+
 test('有結果時頂部自動收成一行，不再有手動收合', () => {
   const app = read('../src/App.jsx')
   assert.match(app, /const compact=!!result\|\|stream\.loading\|\|!!stream\.progress/)
