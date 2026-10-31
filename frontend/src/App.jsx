@@ -20,6 +20,7 @@ import { useI18n } from './i18n/index.jsx'
 import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
 import { detectSource, needsSubtitleImport, sourceHintKey } from './utils/source-info.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
+import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
@@ -153,6 +154,15 @@ export default function App() {
 
   const vc=!notes.vault.configured?{cls:'warn',text:t('vault.notConfigured')}:!notes.vault.exists?{cls:'warn',text:t('vault.missing')}:{cls:'ok',text:t('vault.connected')}
 
+  // 結果頁分頁：單欄時先看重點，換一支影片也回到重點
+  const [narrow,setNarrow]=useState(()=>window.matchMedia(NARROW_QUERY).matches)
+  const [resultTab,setResultTab]=useState('cards')
+  useEffect(()=>{const media=window.matchMedia(NARROW_QUERY);const onChange=e=>setNarrow(e.matches);media.addEventListener('change',onChange);return()=>media.removeEventListener('change',onChange)},[])
+  useEffect(()=>{setResultTab('cards')},[result?.source_url])
+  const activeTab=effectiveResultTab(resultTab,narrow)
+  // 只有影片結果才鎖定版面高度、讓左右兩欄各自捲動；純文章維持整頁捲動
+  const splitLayout=!stream.loading&&!!result&&hasVideo
+
   // 還沒有結果時以網址與開始按鈕為主；開始分析後收成一行，把空間留給影片和卡片
   const compact=!!result||stream.loading||!!stream.progress
   const source=detectSource(url)
@@ -198,10 +208,10 @@ export default function App() {
       {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&subtitleImport}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
-      <main className="workspace" ref={workspaceRef}>
+      <main className={`workspace ${splitLayout?'workspace-split':''}`} data-result-tab={splitLayout&&narrow?activeTab:undefined} ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>
         :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p><ol className="empty-steps"><li>{t('empty.step1')}</li><li>{t('empty.step2')}</li><li>{t('empty.step3')}</li></ol></div>
-        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
+        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)} tabs={resultTabs(narrow)} tab={activeTab} onTabChange={setResultTab}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
       {result&&<>

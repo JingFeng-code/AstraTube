@@ -160,7 +160,6 @@ button:disabled{cursor:not-allowed}
 .pane-video,.deck{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-panel);padding:16px;
 }
-.pane-label{margin:0 0 11px;font-size:13px;color:var(--text-faint);font-weight:750}
 .video-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--radius-control);overflow:hidden;background:#111}
 .video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .chapters{margin-top:12px;display:flex;flex-direction:column;gap:2px;max-height:46vh;overflow-y:auto;padding-right:3px}
@@ -515,4 +514,36 @@ button:disabled{cursor:not-allowed}
   .input-row-home .btn-go{grid-column:1;grid-row:2;width:100%}
   .input-options>.btn-paper{max-width:100%}
   .empty-steps{flex-direction:column;align-items:flex-start}
+}
+
+/* 結果頁：播放器固定，字幕、章節和重點各自捲動 */
+.pane-video{display:flex;flex-direction:column;min-width:0}
+.subtitles-panel[hidden],.chapters[hidden]{display:none}
+.result-tabs{flex:none;display:flex;gap:4px;margin-top:10px;padding:3px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface-2)}
+.result-tabs button{flex:1 1 0;min-width:0;min-height:36px;padding:4px 8px;border:0;border-radius:var(--radius-small);background:transparent;color:var(--text-soft);font-size:14px;font-weight:650;cursor:pointer}
+.result-tabs button:hover{color:var(--text)}
+.result-tabs button.active{background:var(--accent-soft);color:var(--text)}
+.workspace[data-result-tab=subtitles] .deck,.workspace[data-result-tab=chapters] .deck{display:none}
+/* 視窗太矮時放不下固定播放器，維持整頁捲動 */
+@media(min-height:560px){
+  #root:has(.workspace-split){height:100dvh;overflow:hidden}
+  .workspace-split{flex:1 1 0;min-height:0;overflow:hidden;grid-template-rows:minmax(0,1fr);align-items:stretch;padding-bottom:12px}
+  .workspace-split .pane-video,.workspace-split .deck{min-height:0}
+  .workspace-split .video-frame{flex:none;max-height:52vh}
+  /* 底部留白避免最後幾行被浮動按鈕蓋住 */
+  .workspace-split .subtitles-panel,.workspace-split .chapters{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;margin:10px 0 0;padding-bottom:56px}
+  .workspace-split .subtitles-list{max-height:none;overflow:visible}
+  .workspace-split .deck{overflow-y:auto;padding-bottom:64px}
+  .workspace-split .deck>*{flex-shrink:0}
+  .workspace-split .deck-nav-top{top:0}
+}
+@media(max-width:980px){
+  .workspace-split .pane-video{padding:10px}
+}
+@media(max-width:980px) and (min-height:560px){
+  .workspace-split{display:flex;flex-direction:column;gap:10px}
+  .workspace-split .video-frame{max-height:34vh}
+  .workspace-split .pane-video{flex:none}
+  .workspace-split .deck{flex:1 1 0}
+  .workspace[data-result-tab=subtitles] .pane-video,.workspace[data-result-tab=chapters] .pane-video{flex:1 1 0}
 }

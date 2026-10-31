@@ -9,12 +9,14 @@ const COMPACT_FROM = 24
 export default function CardDeck({ result, index, setIndex, clippedIds, onClip, onJumpVideo, deepdives, onDeepDive, deepdiveLoading, onImplement, fullWidth }) {
   const { t } = useI18n()
   const cards=result.cards||[], card=cards[index]
-  const dotsRef=useRef(null)
+  const dotsRef=useRef(null), deckRef=useRef(null)
   // 圓點列可橫向捲動，切換卡片時把目前的圓點帶進視野
   useEffect(()=>{
     const el=dotsRef.current?.children[index]
     el?.scrollIntoView({block:'nearest',inline:'nearest'})
   },[index])
+  // 重點欄會自己捲動，換一張卡時要從頭開始看
+  useEffect(()=>{ if(deckRef.current) deckRef.current.scrollTop=0 },[index])
   if (!card) return null
   const transcript=pickField(card,TRANSCRIPT_KEYS), translation=pickField(card,TRANSLATION_KEYS)
   const points=summaryLines(card.summary)
@@ -24,7 +26,7 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
   const sourceKey=result.transcript_source&&TRANSCRIPT_SOURCE_KEYS[result.transcript_source]
   const [kbdL,kbdR,kbdMid,kbdN,kbdTail]=t('deck.kbdHint','←','→','N')
   return (
-    <section className={`deck ${fullWidth?'deck-full':''}`}>
+    <section className={`deck ${fullWidth?'deck-full':''}`} ref={deckRef}>
       <div className="deck-head">
         <h2 className="deck-title">{result.title}</h2>
         {result.model_used&&<span className="model-badge" title={t('deck.modelTitle')}>{result.model_used}{result.segments>1?t('deck.segments',result.segments):''}</span>}

@@ -168,7 +168,10 @@ export const STRINGS = {
     'source.captions': 'Captions',
     'source.whisper': 'Local transcription',
 
-    'video.pane': 'Video & chapters',
+    'result.tabs': 'Result sections',
+    'result.tab.cards': 'Key points',
+    'result.tab.subtitles': 'Subtitles',
+    'result.tab.chapters': 'Chapters',
 
     'notes.title': 'My notes',
     'notes.count': (n) => `${n} saved`,
@@ -477,7 +480,10 @@ export const STRINGS = {
     'source.captions': '字幕',
     'source.whisper': '本地轉錄',
 
-    'video.pane': '影片與章節',
+    'result.tabs': '結果內容',
+    'result.tab.cards': '重點',
+    'result.tab.subtitles': '字幕',
+    'result.tab.chapters': '章節',
 
     'notes.title': '我的筆記',
     'notes.count': (n) => `${n} 則重點`,
