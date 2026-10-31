@@ -1,3 +1,9 @@
+// 確認沒有本機 CLI 後才自動選 API 引擎：偵測還沒完成就選，會蓋掉能上網查證的 CLI，
+// 使用者也可能在不知情下改用要計費的單次生成。
+export function defaultApiEngine({ status, cli, options }) {
+  return status && !status.has_cli && !cli ? options[0]?.value || '' : ''
+}
+
 // 實作視窗可用的 API 引擎。雲端模型清單只在設定頁驗證連線時取得，不會常駐在 providers，
 // 所以目前選定且已驗證的 AI 來源要另外補進來，否則有金鑰的使用者會一個雲端選項都看不到。
 export function apiEngineOptions({ providers, selectedProvider, geminiReady, geminiModel }) {

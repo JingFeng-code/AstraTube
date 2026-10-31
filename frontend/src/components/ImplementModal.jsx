@@ -4,7 +4,7 @@ import MarkdownText from './MarkdownText.jsx'
 import ImplementProgress from './ImplementProgress.jsx'
 import OutputViewer from './OutputViewer.jsx'
 import { TRACKS, hasCode } from '../hooks/useImplement.js'
-import { apiEngineOptions } from '../utils/implement-engines.js'
+import { apiEngineOptions, defaultApiEngine } from '../utils/implement-engines.js'
 import { useI18n } from '../i18n/index.jsx'
 
 function Bytes({ n }) {
@@ -49,7 +49,7 @@ export default function ImplementModal({ state, providers, selectedProvider, onC
   const apiOptions = apiEngineOptions({ providers, selectedProvider,
     geminiReady: status?.gemini_ready, geminiModel: status?.gemini_model })
   // 沒有本機 CLI 時，選單顯示的第一個 API 引擎要真的被選上；否則後端收不到引擎，只會回安裝教學
-  const firstApiEngine = !hasCli && !cli ? apiOptions[0]?.value : ''
+  const firstApiEngine = defaultApiEngine({ status, cli, options: apiOptions })
   useEffect(() => { if (firstApiEngine) pickEngine(firstApiEngine) }, [firstApiEngine])
   // build 的前提是「影片教你做出某個東西」。不成立的話產出會變成把影片重講一遍，
   // 所以選了就一定提醒；卡片裡連指令或程式碼都沒有時再加重成警告。

@@ -1,6 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { apiEngineOptions } from '../src/utils/implement-engines.js'
+import { apiEngineOptions, defaultApiEngine } from '../src/utils/implement-engines.js'
+
+const options = [{ value: 'openai:gpt-x::', label: 'OpenAI · gpt-x' }]
+
+test('還在偵測本機 CLI 時，不會先選 API 引擎', () => {
+  assert.equal(defaultApiEngine({ status: null, cli: '', options }), '')
+})
+
+test('有本機 CLI 或已選引擎時，不會改選 API 引擎', () => {
+  assert.equal(defaultApiEngine({ status: { has_cli: true }, cli: '', options }), '')
+  assert.equal(defaultApiEngine({ status: { has_cli: false }, cli: 'gemini', options }), '')
+})
+
+test('確認沒有本機 CLI 後，才選第一個 API 引擎', () => {
+  assert.equal(defaultApiEngine({ status: { has_cli: false }, cli: '', options }), 'openai:gpt-x::')
+  assert.equal(defaultApiEngine({ status: { has_cli: false }, cli: '', options: [] }), '')
+})
 
 const providers = {
   ollama: { label: 'Ollama', configured: true, models: ['qwen3:4b'] },
