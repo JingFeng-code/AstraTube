@@ -18,6 +18,26 @@ export function resolveAiSource(selected, providers = {}) {
   // 連線驗證後的新模型可能不在舊版 /models 靜態清單，交由後端驗證。
   return kind!=='ollama' && !!service?.configured && /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(model) ? selected : null
 }
+// 智慧模式只看本機 Ollama，檢查連線時絕不碰雲端供應商。
+export function connectionCheckTarget(engine) {
+  return engine === 'smart' ? 'ollama' : engine
+}
+// 設定頁的連線狀態：只依實際檢查結果判斷，已存金鑰不等於連線成功。
+export function aiConnectionStatus({ engine, model = '', typedKey = '', keySaved = false, checking = false, connection = null, error = '' }) {
+  if (checking) return { level: 'checking', code: 'checking' }
+  const smart = engine === 'smart'
+  if (error) return smart ? { level: 'warn', code: 'localMissing' } : { level: 'error', code: 'failed', detail: error }
+  if (connection?.connected && connection.provider === connectionCheckTarget(engine)) {
+    const models = connection.models || []
+    if (!models.length) return { level: 'warn', code: 'noLocalModels' }
+    if (smart) return { level: 'ok', code: 'smartReady', model: models[0] }
+    return model ? { level: 'ok', code: 'ready', model } : { level: 'warn', code: 'pickModel', count: models.length }
+  }
+  // 智慧模式開啟時一定會檢查，這裡只是檢查開始前的瞬間
+  if (smart) return { level: 'checking', code: 'checking' }
+  if (engine !== 'ollama' && !typedKey.trim() && !keySaved) return { level: 'idle', code: 'needKey' }
+  return { level: 'idle', code: 'unverified' }
+}
 export function aiSourceLabel(selection, resolved, t) {
   if (selection==='smart') return resolved ? t('ai.smartReady') : t('ai.setupRequired')
   if (selection?.startsWith('ollama:')) return resolved ? `Ollama · ${selection.slice(7)}` : t('ai.setupRequired')

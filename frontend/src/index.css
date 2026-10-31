@@ -428,8 +428,13 @@ button:disabled{cursor:not-allowed}
 .subtitle-translation{color:var(--text);font-size:13px}
 
 /* AI 來源：驗證供應商連線與取得模型。 */
-.settings-ollama-check{display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px}
-.settings-ollama-check p{margin:0;flex:1;min-width:180px}
+.settings-status{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface-2)}
+.settings-status p{display:flex;align-items:baseline;gap:8px;flex:1;min-width:200px;margin:0;color:var(--text);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.settings-status .dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--text-faint);transform:translateY(-1px)}
+.settings-status.ok .dot{background:var(--success)}.settings-status.warn .dot{background:var(--warning)}.settings-status.error .dot{background:var(--danger)}
+.settings-status.checking .dot{background:var(--accent)}
+.settings-status.error p{color:var(--danger)}
+.settings-status .settings-cancel{min-height:34px;padding:5px 12px;font-size:13px}
 
 /* 匯入使用者合法持有的字幕。 */
 .subtitle-import-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 20px 12px}
