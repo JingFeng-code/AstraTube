@@ -440,6 +440,8 @@ button:disabled{cursor:not-allowed}
 .subtitle-import-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 20px 12px}
 .subtitle-import-bar button{min-height:32px;font-size:13px;cursor:pointer}
 .subtitle-import-bar button:disabled{opacity:.5;cursor:default}
+.subtitle-import-bar .import-start{padding:5px 14px;border:1px solid var(--accent);border-radius:var(--radius-control);background:var(--accent);color:#fff;font-weight:750}
+.subtitle-import-bar .import-start:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
 .subtitle-import-bar .import-status{font-size:13px;color:var(--text-soft);line-height:1.5}
 .subtitle-import-bar .import-hint{font-size:13px;color:var(--text-faint);flex-basis:100%;line-height:1.5}
 .subtitle-import-bar .import-error{color:var(--danger,#d55);font-size:13px;flex-basis:100%}
