@@ -1,4 +1,4 @@
-"""使用者持有的 SRT/VTT 字幕；綁定官方影片 ID，保存真正的毫秒起訖時間。
+"""使用者持有的 SRT/VTT 字幕；綁定官方影片 ID 或本地影片，保存真正的毫秒起訖時間。
 
 目前為單機工作區資料。對外提供服務前需先加入身分驗證與使用者隔離。
 """
@@ -21,12 +21,24 @@ MAX_CUES = 6000
 MAX_SECONDS = 360000
 MAX_TEXT_LENGTH = 800
 _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+# 本地影片沒有平台 ID：由前端依檔案內容算出識別碼，影片本身不會傳到這裡
+_LOCAL_URL = re.compile(r"^local://([0-9a-f]{16})$")
+_LOCAL_ID = re.compile(r"^[0-9a-f]{16}$")
 _TIME = re.compile(r"(?:(\d{1,3}):)?(\d{2}):(\d{2})[,.](\d{1,3})")
 _FORMATS = {".srt", ".vtt"}
 
 
+def local_id_from_url(url: str) -> str | None:
+    """local://<16 位十六進位> 才算本地影片；其他寫法一律不是。"""
+    match = _LOCAL_URL.fullmatch((url or "").strip())
+    return match.group(1) if match else None
+
+
 def target_from_url(url: str) -> tuple[str, str, int]:
-    """只接受官方 URL，避免將字幕綁到惡意站或任意外部資源。"""
+    """只接受官方 URL 或本地影片識別碼，避免將字幕綁到惡意站或任意外部資源。"""
+    local_id = local_id_from_url(url)
+    if local_id:
+        return "local", local_id, 1
     parsed = urlsplit((url or "").strip())
     if parsed.scheme != "https" or parsed.username or parsed.password:
         raise ValueError("請貼上 HTTPS YouTube 或 Bilibili 官方影片網址。")
@@ -59,6 +71,9 @@ def validate_identity(platform: str, video_id: str, page: int) -> None:
             raise ValueError("YouTube 影片 ID 或分集無效。")
     elif platform == "bilibili":
         bilibili.transcript_cache_key(video_id, page)
+    elif platform == "local":
+        if not _LOCAL_ID.fullmatch(video_id) or page != 1:
+            raise ValueError("本地影片識別碼無效。")
     else:
         raise ValueError("不支援的影片平台。")
 

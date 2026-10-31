@@ -15,7 +15,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, o
     if (!u || loading) return null
     const startedAt = Date.now()
     setLoading(true); setError(''); setCoverage(null); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
-    const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
+    const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, local_video_id: null, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
     let segsDone = 0
     let firstSegmentError = ''
     try {
@@ -25,6 +25,7 @@ export default function useSummarizeStream({ initialResult = null, onSegError, o
         } else if (ev.type === 'meta') {
           draft.source_type = ev.source_type; draft.youtube_video_id = ev.youtube_video_id
           draft.bilibili_video_id = ev.bilibili_video_id || null; draft.bilibili_page = ev.bilibili_page || null
+          draft.local_video_id = ev.local_video_id || null
           draft.segments = ev.segments; draft.transcript_source = ev.transcript_source || null
           setProgress({ stage: 'generate', state: 'starting', completed: 0, total: ev.segments, startedAt })
         } else if (ev.type === 'coverage_limited') {

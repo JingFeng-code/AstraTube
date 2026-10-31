@@ -62,7 +62,7 @@ export default function useImplement({ result, provider, t }) {
       await api.implementStream({
         provider,
         video_title: result?.title || '',
-        video_url: result?.source_url || '',
+        video_url: result?.source_type === 'local' ? '' : result?.source_url || '',
         content_type: result?.content_type || 'other',
         track: useTrack,
         cli: cli || null,

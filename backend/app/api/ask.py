@@ -26,6 +26,10 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     """依序從 DeepSRT 快取 → whisper 快取 → 線上字幕撈逐字稿。"""
     if not video_id:
         return None
+    local = re.fullmatch(r"local:([0-9a-f]{16})", video_id)
+    if local:
+        uploaded = imported_subtitles.load("local", local.group(1))
+        return imported_subtitles.transcript_from_cues(uploaded["cues"]) if uploaded else None
     match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)
     if match:
         bvid, page = match.group(1), int(match.group(2))

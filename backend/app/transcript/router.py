@@ -18,7 +18,7 @@ from app.transcript import bilibili, captions, deepsrt, whisper_local, imported_
 
 class Content(TypedDict):
     """摘要流程共用的內容結構。"""
-    type: str                        # youtube / article / video
+    type: str                        # youtube / bilibili / local / article / video
     video_id: Optional[str]
     title: Optional[str]
     text: str
@@ -109,6 +109,16 @@ def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: boo
     allow_cloud_fallback 只影響「字幕失敗後是否自動改用 Gemini DeepSRT」；
     使用者主動開啟深視覺時仍照常使用 Gemini。
     """
+    local_id = imported_subtitles.local_id_from_url(url)
+    if local_id:
+        if deep_visual:
+            raise ValueError("本地影片不支援讀畫面，請關閉後重試。")
+        uploaded = imported_subtitles.load("local", local_id)
+        if not uploaded:
+            raise ValueError("這支本地影片還沒有字幕，請先匯入 SRT／VTT 字幕檔。")
+        return _pack("local", local_id, imported_subtitles.transcript_from_cues(uploaded["cues"]),
+                     uploaded["is_chinese"], "imported_subtitles")
+
     bili = bilibili.parse_video_url(url)
     if bili:
         if deep_visual:

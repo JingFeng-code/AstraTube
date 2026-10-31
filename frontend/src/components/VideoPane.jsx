@@ -86,7 +86,29 @@ function YouTubePlayer({ videoId, startAt, onTime }) {
     referrerPolicy="strict-origin-when-cross-origin" />
 }
 
-export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump, tabs=[], tab='subtitles', onTabChange, platform='youtube', page=1, provider=null, subtitleRevision=0 }) {
+// 本地影片用瀏覽器內建播放器，檔案只在這台電腦上讀取。重新開啟 App 後要再選一次檔案才能播放。
+function LocalPlayer({ src, startAt, onTime, onPickAgain }) {
+  const { t } = useI18n()
+  const videoRef = useRef(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !startAt.key) return
+    video.currentTime = startAt.t
+    if (startAt.auto) video.play().catch(() => {})
+  }, [startAt.key, startAt.t, startAt.auto])
+  if (!src || failed) {
+    return <div className="local-player-empty">
+      <p>{t(failed ? 'local.playError' : 'local.repickHint')}</p>
+      <button type="button" className="btn-paper" onClick={onPickAgain}>{t('local.repick')}</button>
+    </div>
+  }
+  return <video ref={videoRef} className="local-player" src={src} controls preload="metadata"
+    onTimeUpdate={event => onTime(event.currentTarget.currentTime)} onError={() => setFailed(true)} />
+}
+
+export default function VideoPane({ localSrc=null, onPickLocal, videoId, startAt, cards, activeIndex, onJump, tabs=[], tab='subtitles', onTabChange, platform='youtube', page=1, provider=null, subtitleRevision=0 }) {
   const { t } = useI18n()
   const [cues, setCues] = useState([])
   const [subtitleError, setSubtitleError] = useState('')
@@ -190,8 +212,8 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
     setManualSeek(s => ({t:seconds,auto:true,key:s.key+1}))
   }
 
-  // YouTube 的原生 API 可讀取真實進度；Bilibili 官方 iframe 目前只支援帶秒數重新開啟。
-  const active = platform === 'youtube' ? activeCueIndex(cues, time) : -1
+  // YouTube 和本地影片讀得到真實進度；Bilibili 官方 iframe 目前只支援帶秒數重新開啟。
+  const active = platform !== 'bilibili' ? activeCueIndex(cues, time) : -1
   useEffect(() => { activeRef.current = active }, [active])
   const translatedCount = cues.filter(c => !!c.translation).length
   const allTranslated = cues.length > 0 && translatedCount === cues.length
@@ -203,11 +225,13 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
   return (
     <section className="pane-video">
       <div className="video-frame">
-        {platform === 'youtube' ?
+        {platform === 'local' ?
+          <LocalPlayer src={localSrc} startAt={seek} onTime={setTime} onPickAgain={onPickLocal} /> :
+        platform === 'youtube' ?
           <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={setTime} /> :
           <iframe key={`${startAt.key}:${manualSeek.key}`} src={biliSrc} title="Bilibili"
             allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
-        {/* 只有 YouTube 能讀到播放進度，才能把字幕對到畫面上；不攔截滑鼠，不影響播放器操作 */}
+        {/* Bilibili 讀不到播放進度，其他來源才能把字幕對到畫面上；不攔截滑鼠，不影響播放器操作 */}
         {overlay.length > 0 && <div className="subtitle-overlay" aria-hidden="true">
           {overlay.map(line => <span key={line.kind} className={`subtitle-overlay-line ${line.kind}`}>{line.text}</span>)}
         </div>}
@@ -240,7 +264,7 @@ export default function VideoPane({ videoId, startAt, cards, activeIndex, onJump
               {allTranslated ? t('subtitles.translateDone') :
                 translatedCount > 0 ? t('subtitles.translateResume', cues.length - translatedCount) : t('subtitles.translateAll', cues.length)}
             </button>}
-          {platform === 'youtube' && <div className="subtitle-mode" role="group" aria-label={t('subtitles.modeLabel')}>
+          {platform !== 'bilibili' && <div className="subtitle-mode" role="group" aria-label={t('subtitles.modeLabel')}>
             {SUBTITLE_MODES.map(mode => (
               <button key={mode} type="button" aria-pressed={subtitleMode === mode}
                 className={subtitleMode === mode ? 'active' : ''} onClick={() => setSubtitleMode(mode)}>

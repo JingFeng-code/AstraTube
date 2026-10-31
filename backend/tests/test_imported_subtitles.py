@@ -107,6 +107,61 @@ def test_imported_youtube_used_by_summary_ask_and_player():
             assert imported.load("youtube", YOUTUBE,1) is None
 
 
+LOCAL_ID = "0123456789abcdef"
+
+
+def test_local_video_identity_is_strict():
+    assert imported.target_from_url(f"local://{LOCAL_ID}") == ("local", LOCAL_ID, 1)
+    for url in (f"local://{LOCAL_ID}/x", "local://short", f"local://{LOCAL_ID.upper()}",
+                "local://../../etc/passwd", f"http://local/{LOCAL_ID}"):
+        assert imported.local_id_from_url(url) is None
+        try:
+            imported.target_from_url(url)
+            assert False, url
+        except ValueError:
+            pass
+    for video_id, page in (("../../x", 1), (LOCAL_ID, 2), ("short", 1)):
+        try:
+            imported.validate_identity("local", video_id, page)
+            assert False, video_id
+        except ValueError:
+            pass
+
+
+def test_local_video_needs_subtitles_then_used_by_summary_ask_and_player():
+    with TemporaryDirectory() as location:
+        with patch.object(imported, "CACHE_DIR", Path(location)):
+            url = f"local://{LOCAL_ID}"
+            try:
+                route_content(url)
+                assert False, "must need subtitles first"
+            except ValueError as exc:
+                assert "SRT" in str(exc)
+            assert ask_api._load_transcript(f"local:{LOCAL_ID}") is None
+            try:
+                subtitles.get_subtitles("local", LOCAL_ID, 1)
+                assert False, "no subtitles yet"
+            except subtitles.HTTPException as exc:
+                assert exc.status_code == 404
+            result = subtitle_import.import_subtitles(subtitle_import.ImportRequest(
+                video_url=url, filename="mine.srt", content=SRT))
+            assert result["platform"] == "local" and result["cue_count"] == 2
+            # 本地影片全程不碰平台與網路
+            with patch("app.transcript.router.fetch_article", side_effect=AssertionError("no network")), \
+                 patch("app.transcript.router.captions.fetch_transcript", side_effect=AssertionError("no network")):
+                summary = route_content(url)
+            assert summary["type"] == "local" and summary["video_id"] == LOCAL_ID
+            assert summary["transcript_source"] == "imported_subtitles"
+            assert "Create an API" in ask_api._load_transcript(f"local:{LOCAL_ID}")
+            assert subtitles.get_subtitles("local", LOCAL_ID, 1)["source"] == "imported"
+            try:
+                route_content(url, deep_visual=True)
+                assert False, "local video must not use read screen"
+            except ValueError:
+                pass
+            assert subtitle_import.remove_subtitles(subtitle_import.TargetRequest(video_url=url))["removed"] is True
+
+
 def test_imported_bilibili_scoped_to_page():
     with TemporaryDirectory() as location:
         with patch.object(imported, "CACHE_DIR", Path(location)):

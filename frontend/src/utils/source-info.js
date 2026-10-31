@@ -18,6 +18,7 @@ const SOURCE_HINT_KEYS = {
   bilibili: 'input.sourceBilibili',
   bilibiliShort: 'input.sourceBilibiliShort',
   article: 'input.sourceArticle',
+  local: 'input.sourceLocal',
 }
 
 export const sourceHintKey = source => SOURCE_HINT_KEYS[source] || null
