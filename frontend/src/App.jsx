@@ -18,7 +18,7 @@ import useCards from './hooks/useCards.js'
 import useNotesVault from './hooks/useNotesVault.js'
 import { useI18n } from './i18n/index.jsx'
 import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl } from './utils/user-mode.js'
-import { detectSource, needsSubtitleImport, sourceHintKey } from './utils/source-info.js'
+import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } from './utils/source-info.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
 
@@ -81,6 +81,7 @@ export default function App() {
   useLayoutEffect(()=>{workspaceRef.current?.style.setProperty('--split',String(split))},[split])
   const [freeNote,setFreeNote]=useState(SAVED.freeNote||''), [filename,setFilename]=useState(SAVED.filename||'')
   const [showSettings,setShowSettings]=useState(false)
+  const [settingsFocus,setSettingsFocus]=useState(null)
   const [subtitleRevision,setSubtitleRevision]=useState(0)
   const [toast,setToast]=useState(null)
   const toastTimer=useRef(null)
@@ -111,6 +112,7 @@ export default function App() {
   function handleSettingsSaved(next){
     setSettings(next)
     setShowSettings(false)
+    setSettingsFocus(null)
     notes.refresh()
     refreshModels()   // 剛填的金鑰要立刻反映在模型下拉選單上
     showToast(t('toast.settingsSaved'))
@@ -123,11 +125,15 @@ export default function App() {
   const isBilibili=result?.source_type==='bilibili'&&!!result?.bilibili_video_id
   const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili
 
-  async function handleSummarize(){
+  async function startAnalysis(useVisual){
     if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}
     cardsHook.resetForNewResult()
-    await stream.summarize(url,activeProvider,effectiveDeepVisual(deepVisual,url))
+    await stream.summarize(url,activeProvider,useVisual)
   }
+  const handleSummarize=()=>startAnalysis(effectiveDeepVisual(deepVisual,url))
+  // 使用者明確按下才開啟：影片會交給 Google，不能因為有金鑰就自動改走這條路
+  function analyzeWithVisual(){setDeepVisual(true);startAnalysis(true)}
+  function openVisualKeySettings(){setSettingsFocus('visual-key');setShowSettings(true)}
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
   async function onDeepDive(i){if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
   async function handleSave(){
@@ -168,6 +174,7 @@ export default function App() {
   const source=detectSource(url)
   const showSourceHint=!!source&&(!compact||url.trim()!==(result?.source_url||'').trim())
   const errorNeedsImport=needsSubtitleImport(stream.error)
+  const captionAction=errorNeedsImport?noCaptionAction(source,deepVisual,!!providers?.gemini?.configured):null
   const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
   const sourceForm=(
     <section className={`input-row ${compact?'input-row-compact':'input-row-home'}`} aria-label={t('input.section')}>
@@ -203,9 +210,9 @@ export default function App() {
       </header>
       {!compact&&sourceForm}
       {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
-      {visualNotice&&<p className="subtitles-hint" role="status">{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</p>}
+      {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize}/>}</div>}
+      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className={`workspace ${splitLayout?'workspace-split':''}`} data-result-tab={splitLayout&&narrow?activeTab:undefined} ref={workspaceRef}>
@@ -224,7 +231,7 @@ export default function App() {
       </>}
       {implement.open&&<ImplementModal state={implement} providers={providers} selectedProvider={activeProvider} onClose={implement.close} onToast={showToast}/>}
       {toast&&<div className={`toast ${toast.isErr?'err':''}`}>{toast.msg}</div>}
-      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>{setShowSettings(false);refreshModels()}} onSaved={handleSettingsSaved}/>}
+      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} focus={settingsFocus} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>{setShowSettings(false);setSettingsFocus(null);refreshModels()}} onSaved={handleSettingsSaved}/>}
     </>
   )
 }

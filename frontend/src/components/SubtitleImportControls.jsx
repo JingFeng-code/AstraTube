@@ -5,7 +5,7 @@ import { useI18n } from '../i18n/index.jsx'
 const MAX_FILE_SIZE = 1024 * 1024
 
 // onAnalyze 只在分析失敗後的錯誤區傳入：匯入完可以直接開始，不必再回頭找「開始」按鈕
-export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze }) {
+export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze, noFileHint }) {
   const { t } = useI18n()
   const inputRef = useRef(null)
   const [state, setState] = useState(null)
@@ -87,7 +87,7 @@ export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze 
       </span>}
       {message && <span className="import-status" role="status">{message}</span>}
       {error && <span className="import-error" role="alert">{error}</span>}
-      {!state?.exists && <span className="import-hint">{t(onAnalyze ? 'subtitles.importNoFile' : 'subtitles.importHint')}</span>}
+      {!state?.exists && <span className="import-hint">{onAnalyze ? (noFileHint || t('subtitles.importNoFile')) : t('subtitles.importHint')}</span>}
     </section>
   )
 }
