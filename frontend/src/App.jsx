@@ -214,7 +214,7 @@ export default function App() {
           <AskPanel provider={activeProvider} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
         </FloatingPanel>
       </>}
-      {implement.open&&<ImplementModal state={implement} providers={providers} onClose={implement.close} onToast={showToast}/>}
+      {implement.open&&<ImplementModal state={implement} providers={providers} selectedProvider={activeProvider} onClose={implement.close} onToast={showToast}/>}
       {toast&&<div className={`toast ${toast.isErr?'err':''}`}>{toast.msg}</div>}
       {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
     </>

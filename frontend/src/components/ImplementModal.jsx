@@ -4,13 +4,14 @@ import MarkdownText from './MarkdownText.jsx'
 import ImplementProgress from './ImplementProgress.jsx'
 import OutputViewer from './OutputViewer.jsx'
 import { TRACKS, hasCode } from '../hooks/useImplement.js'
+import { apiEngineOptions } from '../utils/implement-engines.js'
 import { useI18n } from '../i18n/index.jsx'
 
 function Bytes({ n }) {
   return <span className="impl-size">{n < 1024 ? `${n} B` : `${Math.round(n / 1024)} KB`}</span>
 }
 
-export default function ImplementModal({ state, providers, onClose, onToast }) {
+export default function ImplementModal({ state, providers, selectedProvider, onClose, onToast }) {
   const { t } = useI18n()
   const { status, track, setTrack, cli, setCli, cliModel, setCliModel, running, lines, outcome,
           suggested, cardCount, phase, liveFiles, startedAt, activity } = state
@@ -44,19 +45,17 @@ export default function ImplementModal({ state, providers, onClose, onToast }) {
     if (!group.length) group.push({ value: `${c.name}::`, label: `${c.label} · ${c.default_model || t('implement.builtinModel')}` })
     cliOptions.push(...group)
   }
-  const apiOptions = []
-  if (status?.gemini_ready) apiOptions.push({ value: 'gemini::', label: `Gemini · ${status.gemini_model}` })
-  for (const key of Object.keys(providers || {})) {
-    const p = providers[key]
-    if (key === 'gemini' || !p || (!p.free && !p.configured)) continue
-    for (const m of p.models || []) apiOptions.push({ value: `${key}:${m}::`, label: `${p.label} · ${m}` })
-  }
+  const pickEngine = (v) => { const i = v.lastIndexOf('::'); setCli(v.slice(0, i)); setCliModel(v.slice(i + 2)) }
+  const apiOptions = apiEngineOptions({ providers, selectedProvider,
+    geminiReady: status?.gemini_ready, geminiModel: status?.gemini_model })
+  // 沒有本機 CLI 時，選單顯示的第一個 API 引擎要真的被選上；否則後端收不到引擎，只會回安裝教學
+  const firstApiEngine = !hasCli && !cli ? apiOptions[0]?.value : ''
+  useEffect(() => { if (firstApiEngine) pickEngine(firstApiEngine) }, [firstApiEngine])
   // build 的前提是「影片教你做出某個東西」。不成立的話產出會變成把影片重講一遍，
   // 所以選了就一定提醒；卡片裡連指令或程式碼都沒有時再加重成警告。
   const activeTrack = track || suggested
   const buildRisky = activeTrack === 'build' && !hasCode(state.cards || [])
   const engineValue = `${cli}::${cliModel}`
-  const pickEngine = (v) => { const i = v.lastIndexOf('::'); setCli(v.slice(0, i)); setCliModel(v.slice(i + 2)) }
 
   async function copy(text) {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }

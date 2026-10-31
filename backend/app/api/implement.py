@@ -222,7 +222,9 @@ def implement(req: ImplementRequest) -> StreamingResponse:
 
     def gen() -> Iterator[str]:
         found = agent_cli.detect()
-        want = (req.cli or "").lower()
+        # CLI 名稱不分大小寫，但模型 ID 有分（例如 together:meta-llama/Llama-3），不能整串轉小寫
+        raw_want = (req.cli or "").strip()
+        want = raw_want.lower()
         gemini_ready = gemini.key_count() > 0
 
         # 選執行者。三種可能：
@@ -232,7 +234,7 @@ def implement(req: ImplementRequest) -> StreamingResponse:
         cli_names = {c["name"] for c in found}
         if want and want not in cli_names:
             # 不是 CLI 名稱，就當成 provider 字串交給 llm_router 解析
-            engine, label = ("api:" + want, _api_label(want))
+            engine, label = ("api:" + raw_want, _api_label(raw_want))
             if want == "gemini" and not gemini_ready:
                 engine, label = (None, "")
         else:

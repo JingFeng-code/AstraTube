@@ -475,6 +475,33 @@ def test_any_api_provider_can_drive_implementation():
         impl.llm_router.generate = original_router
 
 
+def test_api_model_id_keeps_its_case():
+    """模型 ID 有分大小寫，轉成小寫後服務端會找不到模型。"""
+    original_detect, original_router = agent_cli.detect, impl.llm_router.generate
+    try:
+        impl.agent_cli.detect = lambda: []
+        seen = {}
+
+        def fake(provider, prompt, system="", *a, **k):
+            seen["provider"] = provider
+            return (f"{FILE_BEGIN}study.html>>>
+<h1>ok</h1>
+{FILE_END}", "Llama-3")
+
+        impl.llm_router.generate = fake
+        events = asyncio.run(_events(impl.implement(ImplementRequest(
+            video_title="大小寫測試", cli="together:meta-llama/Llama-3",
+            cards=[Card(heading="卡", summary="內容")]))))
+        assert seen["provider"] == "together:meta-llama/Llama-3"
+        wd = Path(events[-1]["workdir"])
+        for f in wd.iterdir():
+            f.unlink()
+        wd.rmdir()
+    finally:
+        impl.agent_cli.detect = original_detect
+        impl.llm_router.generate = original_router
+
+
 def test_gemini_truncated_output_fails_loudly():
     """被截斷時不能默默交出空資料夾，要明講並建議改用 CLI。"""
     original_detect, original_keys = agent_cli.detect, impl.gemini.key_count
@@ -537,6 +564,7 @@ if __name__ == "__main__":
     test_parse_inline_files_strips_stray_code_fence()
     test_gemini_path_writes_files_and_flags_unverified()
     test_any_api_provider_can_drive_implementation()
+    test_api_model_id_keeps_its_case()
     test_gemini_truncated_output_fails_loudly()
     test_no_cli_falls_back_to_a_real_install_guide()
     test_no_cli_and_no_model_still_returns_something()
