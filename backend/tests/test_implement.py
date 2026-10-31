@@ -484,9 +484,7 @@ def test_api_model_id_keeps_its_case():
 
         def fake(provider, prompt, system="", *a, **k):
             seen["provider"] = provider
-            return (f"{FILE_BEGIN}study.html>>>
-<h1>ok</h1>
-{FILE_END}", "Llama-3")
+            return (f"{FILE_BEGIN}study.html>>>\n<h1>ok</h1>\n{FILE_END}", "Llama-3")
 
         impl.llm_router.generate = fake
         events = asyncio.run(_events(impl.implement(ImplementRequest(
