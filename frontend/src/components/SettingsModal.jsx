@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from '../api.js'
 import { useI18n } from '../i18n/index.jsx'
 import { PROVIDER_ORDER, providerValue } from '../hooks/useModels.js'
-import { aiSourceLabel, resolveAiSource } from '../utils/ai-source.js'
+import { aiConnectionStatus, connectionCheckTarget } from '../utils/ai-source.js'
 
 // 同一頁只處理一個供應商，不再把所有供應商的模型攤平成選單。
 const KEY_FIELDS = {
@@ -33,6 +33,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
   const [keys, setKeys] = useState({})
   const [connection, setConnection] = useState(null)
   const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState('')
   const checkVersion = useRef(0)
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
   const [folder, setFolder] = useState(state?.obsidian_notes_folder || 'Youtube Card Reader')
@@ -51,62 +52,77 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
   const visibleModels = available.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
   const chosenSource = isSmart ? 'smart' : model ? providerValue(engine, model) : ''
   const unchangedSource = chosenSource === provider || (provider === 'gemini' && engine === 'gemini' && !model)
+  const status = aiConnectionStatus({ engine, model, typedKey, keySaved, checking, connection, error: checkError })
+  // 智慧模式不需要驗證就能儲存，不必等本機檢查跑完
+  const saveBlocked = saving || (checking && !isSmart)
+  const statusText = {
+    checking: () => t('ai.verifying'),
+    smartReady: () => t('ai.status.smartReady', status.model),
+    ready: () => t('ai.status.ready', status.model),
+    pickModel: () => t('ai.status.pickModel', status.count),
+    noLocalModels: () => t('settings.ollamaNoModels'),
+    localMissing: () => t('ai.status.localMissing'),
+    failed: () => t('ai.verifyFailed', status.detail),
+    needKey: () => t('ai.status.needKey'),
+    unverified: () => t('ai.status.unverified'),
+  }[status.code]()
 
-  function switchEngine(next) {
+  function resetCheck() {
     ++checkVersion.current
+    setConnection(null)
+    setCheckError('')
+    setChecking(false)
+  }
+  function switchEngine(next) {
+    resetCheck()
     setEngine(next)
     setModel(next === initial.engine ? initial.model : '')
-    setConnection(null)
     setModelSearch('')
-    setChecking(false)
     setErr('')
   }
   function editKey(value) {
-    ++checkVersion.current
+    resetCheck()
     setKeys(prev => ({ ...prev, [KEY_FIELDS[engine]]: value }))
-    setConnection(null)
-    setChecking(false)
     setErr('')
   }
   function editOllamaUrl(value) {
-    ++checkVersion.current
+    resetCheck()
     setOllamaUrl(value)
-    setConnection(null)
-    setChecking(false)
   }
   async function checkProvider(target = engine, key = typedKey, url = ollamaUrl) {
-    if (target === 'smart') return
     const version = ++checkVersion.current
+    const kind = connectionCheckTarget(target)
     setChecking(true)
     setConnection(null)
+    setCheckError('')
     setErr('')
     try {
       const result = await api.checkProvider({
-        provider: target,
+        provider: kind,
         ...(key?.trim() ? { api_key: key.trim() } : {}),
-        ...(target === 'ollama' ? { ollama_base_url: url.trim() } : {}),
+        ...(kind === 'ollama' ? { ollama_base_url: url.trim() } : {}),
       })
       if (version !== checkVersion.current) return
       setConnection(result)
       setModel(prev => result.models.includes(prev) ? prev : '')
     } catch (e) {
-      if (version === checkVersion.current) setErr(t('ai.verifyFailed', e.message))
+      if (version === checkVersion.current) setCheckError(e.message)
     } finally {
       if (version === checkVersion.current) setChecking(false)
     }
   }
 
-  // 已設定金鑰不用再輸入；本機 Ollama 可直接檢查連線。
+  // 已設定金鑰不用再輸入；本機 Ollama 和智慧模式可直接檢查連線。
   // 只檢查目前所選的供應商，不同時向所有雲端服務發出請求。
   useEffect(() => {
-    if (engine === 'smart' || (KEY_FIELDS[engine] && !state?.[`${engine}_set`])) return
+    if (KEY_FIELDS[engine] && !state?.[`${engine}_set`]) return
     if (KEY_FIELDS[engine] && keys[KEY_FIELDS[engine]]?.trim()) return
     checkProvider(engine, '', ollamaUrl)
     return () => { ++checkVersion.current }
   }, [engine, state])
 
   async function handleSave() {
-    if (saving || checking) return
+    if (saveBlocked) return
     setErr('')
     const changing = !unchangedSource
     const ollamaChanged = engine === 'ollama' && ollamaUrl.trim() !== (state?.ollama_base_url || 'http://127.0.0.1:11434')
@@ -146,14 +162,6 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
           {!mandatory && <button className="settings-x" onClick={onClose} aria-label={t('settings.close')}>✕</button>}
         </div>
         <div className="settings-body">
-          <div className="settings-divider"><span>{t('settings.interface')}</span></div>
-          <label className="settings-field">
-            <span className="settings-label">{t('settings.uiLanguage')}</span>
-            <select value={lang} onChange={e=>setLang(e.target.value)}>
-              {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
-            </select>
-          </label>
-
           <div className="settings-divider"><span>{t('ai.source')}</span></div>
           <label className="settings-field">
             <span className="settings-label">{t('ai.chooseProvider')}</span>
@@ -168,7 +176,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
                 )}
               </optgroup>
             </select>
-            {isSmart && <span className="settings-hint">{aiSourceLabel('smart',resolveAiSource('smart',providers),t)} · {t('ai.smartHint')}</span>}
+            {isSmart && <span className="settings-hint">{t('ai.smartHint')}</span>}
           </label>
 
           {!isSmart && <>
@@ -185,15 +193,15 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
                 placeholder="http://127.0.0.1:11434" autoComplete="off" spellCheck={false} />
               <span className="settings-hint">{t('settings.ollamaUrlHint')}</span>
             </label>}
-            <div className="settings-ollama-check">
-              <button type="button" className="settings-cancel" disabled={checking || saving ||
-                (keyField && !keySaved && !typedKey.trim())} onClick={()=>checkProvider()}>
-                {checking ? t('ai.verifying') : t('ai.verifyConnection')}
-              </button>
-              <p className={verified?'settings-hint':'settings-err'} role="status">
-                {verified ? t('ai.verified', available.length) : checking ? t('ai.verifying') : ''}
-              </p>
-            </div>
+          </>}
+          <div className={`settings-status ${status.level}`}>
+            <p role="status"><span className="dot" aria-hidden="true" />{statusText}</p>
+            <button type="button" className="settings-cancel" disabled={checking || saving ||
+              (keyField && !keySaved && !typedKey.trim())} onClick={()=>checkProvider()}>
+              {isSmart ? t('ai.recheck') : t('ai.verifyConnection')}
+            </button>
+          </div>
+          {!isSmart && <>
             {verified && <div className="settings-field">
               <span className="settings-label">{t('ai.chooseModel')}</span>
               {available.length > 20 && <input type="search" value={modelSearch}
@@ -209,14 +217,21 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
             </div>}
           </>}
           <p className="settings-hint">{t('ai.sharedHint')}</p>
-          <p className="settings-hint">{t('ai.localPlanned')}</p>
+          {status.code === 'localMissing' && <p className="settings-hint">{t('ai.localPlanned')}</p>}
 
-          <div className="settings-divider"><span>{t('settings.output')}</span></div>
+          <div className="settings-divider"><span>{t('settings.language')}</span></div>
+          <label className="settings-field">
+            <span className="settings-label">{t('settings.uiLanguage')}</span>
+            <select value={lang} onChange={e=>setLang(e.target.value)}>
+              {langs.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+          </label>
           <label className="settings-field">
             <span className="settings-label">{t('settings.outputLanguage')}</span>
             <select value={outputLanguage} onChange={e=>setOutputLanguage(e.target.value)}>
               {languages.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
+            <span className="settings-hint">{t('settings.outputLanguageHint')}</span>
           </label>
 
           <details className="settings-advanced">
@@ -241,7 +256,7 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
         </div>
         <div className="settings-foot">
           {!mandatory && <button className="settings-cancel" onClick={onClose} disabled={saving}>{t('settings.cancel')}</button>}
-          <button className="settings-save" onClick={handleSave} disabled={saving || checking}>
+          <button className="settings-save" onClick={handleSave} disabled={saveBlocked}>
             {saving ? t('settings.saving') : (mandatory ? t('settings.saveStart') : t('settings.save'))}
           </button>
         </div>

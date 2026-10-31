@@ -224,7 +224,7 @@ export default function App() {
       </>}
       {implement.open&&<ImplementModal state={implement} providers={providers} selectedProvider={activeProvider} onClose={implement.close} onToast={showToast}/>}
       {toast&&<div className={`toast ${toast.isErr?'err':''}`}>{toast.msg}</div>}
-      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>setShowSettings(false)} onSaved={handleSettingsSaved}/>}
+      {(needsSetup||showSettings)&&<SettingsModal state={settings} mandatory={needsSetup} provider={provider} providers={providers} onProviderChange={setAiSource} onClose={()=>{setShowSettings(false);refreshModels()}} onSaved={handleSettingsSaved}/>}
     </>
   )
 }
