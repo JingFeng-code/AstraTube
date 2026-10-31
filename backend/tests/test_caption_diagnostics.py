@@ -159,7 +159,7 @@ def test_bilibili_login_restriction_is_kept_and_suggests_import():
         try:
             bilibili.fetch_transcript("BV1WQHP66EPS", 1)
         except ValueError as exc:
-            assert "需要登入" in str(exc) and "不讀取帳號 Cookie" in str(exc) and "SRT" in str(exc)
+            assert "需要登入" in str(exc) and "不會使用你的帳號" in str(exc) and "SRT" in str(exc)
         else:
             raise AssertionError("login-only subtitles must not be fetched")
 

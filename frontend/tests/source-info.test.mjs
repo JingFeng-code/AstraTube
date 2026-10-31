@@ -41,6 +41,21 @@ test('只有請使用者匯入字幕的錯誤才顯示匯入按鈕', () => {
   assert.equal(needsSubtitleImport(''), false)
 })
 
+test('分析失敗後可以直接匯入字幕並開始，一般入口維持原樣', () => {
+  const app = read('../src/App.jsx')
+  const controls = read('../src/components/SubtitleImportControls.jsx')
+  assert.match(app, /errorNeedsImport&&<SubtitleImportControls .*?onAnalyze=\{handleSummarize\}/)
+  assert.match(app, /const subtitleImport=<SubtitleImportControls videoUrl=\{url\} onChanged=\{[^}]*\}\/>/)
+  // 確實匯入後才出現開始按鈕，匯入後也不再提示沒有字幕檔
+  assert.match(controls, /onAnalyze && state\?\.exists && <button[^>]*className="import-start"/)
+  assert.match(controls, /!state\?\.exists && <span className="import-hint">/)
+  for (const table of Object.values(STRINGS)) {
+    assert.ok(table['subtitles.importAnalyze'])
+    assert.ok(table['subtitles.importNoFile'])
+  }
+  assert.match(STRINGS.zh['input.sourceBilibili'], /部分影片的字幕需要登入/)
+})
+
 test('窄螢幕的分析選項面板對齊整列，不會超出畫面', () => {
   const css = read('../src/index.css')
   assert.match(css, /\.input-options\{position:relative\}\s*\.ai-advanced\[open\]\{position:static\}/)

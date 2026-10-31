@@ -4,7 +4,8 @@ import { useI18n } from '../i18n/index.jsx'
 
 const MAX_FILE_SIZE = 1024 * 1024
 
-export default function SubtitleImportControls({ videoUrl, onChanged }) {
+// onAnalyze 只在分析失敗後的錯誤區傳入：匯入完可以直接開始，不必再回頭找「開始」按鈕
+export default function SubtitleImportControls({ videoUrl, onChanged, onAnalyze }) {
   const { t } = useI18n()
   const inputRef = useRef(null)
   const [state, setState] = useState(null)
@@ -77,6 +78,8 @@ export default function SubtitleImportControls({ videoUrl, onChanged }) {
               onClick={() => inputRef.current?.click()}>
         {busy?t('subtitles.importLoading'):t('subtitles.importAction')}
       </button>
+      {onAnalyze && state?.exists && <button type="button" className="import-start"
+          disabled={busy} onClick={onAnalyze}>{t('subtitles.importAnalyze')}</button>}
       {state?.exists && <button type="button" className="btn-paper"
           disabled={busy} onClick={remove}>{t('subtitles.removeAction')}</button>}
       {state?.exists && <span className="import-status">
@@ -84,7 +87,7 @@ export default function SubtitleImportControls({ videoUrl, onChanged }) {
       </span>}
       {message && <span className="import-status" role="status">{message}</span>}
       {error && <span className="import-error" role="alert">{error}</span>}
-      <span className="import-hint">{t('subtitles.importHint')}</span>
+      {!state?.exists && <span className="import-hint">{t(onAnalyze ? 'subtitles.importNoFile' : 'subtitles.importHint')}</span>}
     </section>
   )
 }
