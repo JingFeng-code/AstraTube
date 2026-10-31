@@ -7,4 +7,4 @@
 - Do not auto-run shell commands derived from video/transcript text; require explicit user approval.
 - Use official YouTube embed/player interfaces. Respect media rights and platform terms.
 - Prioritize minimum incremental changes with tests. Keep backend and frontend CI green.
-- New features (Ollama, real-time bilingual subtitles, VideoToNo) are planned, not yet implemented. Never describe them as available prematurely.
+- Ollama and whole-video bilingual subtitles are implemented, but still need real-device acceptance on Windows; state that limit when describing them. Planned features (for example VideoToNo) are not implemented. Never describe them as available prematurely.
