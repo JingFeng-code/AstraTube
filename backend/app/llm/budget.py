@@ -1,8 +1,7 @@
-"""Per-provider summarization budgets.
+"""各供應商的摘要額度預算。
 
-For Groq, use conservative initial settings for low-TPM accounts, then pace requests
-with the official x-ratelimit headers. These are safeguards, not verified account
-entitlements; Groq can apply different limits per account and per model.
+Groq 先以低 TPM 帳號的保守設定起步，再依官方 x-ratelimit 回應標頭調整請求速度。
+這些只是保護措施，不代表帳號實際的額度；Groq 可能依帳號與模型套用不同限制。
 """
 from __future__ import annotations
 
@@ -23,8 +22,8 @@ class SummaryBudget:
     workers: int = 1
 
 
-# The user's observed free/on-demand Groq limits for these models are 8k TPM.
-# Other Groq models begin conservatively and update from response headers.
+# 這些模型實測的 Groq 免費／隨選額度是 8k TPM。
+# 其他 Groq 模型同樣從保守值開始，再依回應標頭更新。
 GROQ_LOW_TPM_MODELS = frozenset({
     "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b",
 })
@@ -39,7 +38,7 @@ def _groq_start_tpm(model: str) -> int:
 
 
 def summary_budget(provider: str | None) -> SummaryBudget | None:
-    """Initial per-model estimates, adapted to actual TPM once headers are observed."""
+    """各模型的初始估計值，收到回應標頭後會改用實際的 TPM。"""
     if not provider or not provider.startswith("groq:"):
         return None
     model = provider.removeprefix("groq:").strip()
@@ -55,7 +54,7 @@ def summary_budget(provider: str | None) -> SummaryBudget | None:
 
 
 def estimate_tokens(messages: list[dict]) -> int:
-    """Conservative heuristic, not a tokenizer: CJK ≈ 1 token/char, Latin ≈ 1/3."""
+    """保守的估算，不是真正的 tokenizer：中日韓文字約每字 1 token，拉丁字母約每字 1/3。"""
     total = 0
     for message in messages:
         content = str(message.get("content") or "")
@@ -77,7 +76,7 @@ def trim_to_tokens(text: str, max_tokens: int) -> str:
 
 
 def _seconds(value: str | None) -> float | None:
-    """Groq reset values: 2m59.56s / 7.66s / 500ms, or Retry-After seconds."""
+    """解析 Groq 的重置時間（2m59.56s／7.66s／500ms）或 Retry-After 秒數。"""
     if not value:
         return None
     value = value.strip().lower()
@@ -93,10 +92,10 @@ def _seconds(value: str | None) -> float | None:
 
 
 class GroqPacer:
-    """A process-local rate gate shared across simultaneous Groq requests.
+    """同一個程序內所有 Groq 請求共用的速度閘門。
 
-    It never stores API credentials. The server's own headers override our
-    conservative default; actual 429s still need an explicit retry/error path.
+    不會儲存 API 憑證。服務端回應標頭優先於我們的保守預設值；
+    真的遇到 429 時，仍要走明確的重試或錯誤流程。
     """
 
     def __init__(self):
@@ -110,7 +109,7 @@ class GroqPacer:
 
     def before(self, model: str, estimated: int, *,
                on_status: Callable[[dict], None] | None = None) -> None:
-        # Serialized per model, preventing free-tier parallel bursts.
+        # 每個模型依序排隊，避免免費額度被同時送出的請求用完。
         with self._lock:
             state = self._states.setdefault(model, {
                 "next_at": 0.0, "tpm": _groq_start_tpm(model),
@@ -118,14 +117,14 @@ class GroqPacer:
             })
             now = time.monotonic()
             remaining = state["remaining"]
-            # Remaining is only meaningful until the reset; never reuse it forever.
+            # 剩餘額度只在重置前有意義，不能一直沿用。
             if remaining is not None and now >= state["reset_at"]:
                 state["remaining"] = None
                 remaining = None
             delay = max(0.0, state["next_at"] - now)
             if remaining is not None and remaining < estimated:
                 delay = max(delay, max(0.0, state["reset_at"] - now))
-            # Reserve pessimistically before any network request starts.
+            # 送出網路請求前先用保守估計佔好額度。
             # 先佔好時段再放開鎖：同模型的請求照樣排隊，但其他模型與查詢不會被這次等待卡住
             state["next_at"] = now + delay + 60.0 * estimated / max(1, state["tpm"])
             if state["remaining"] is not None:
@@ -152,7 +151,7 @@ class GroqPacer:
                 state["reset_at"] = time.monotonic() + reset
 
     def retry_delay(self, model: str, headers: Mapping[str, str]) -> float | None:
-        """Retry delay from official rate-limit headers, not arbitrary rapid retries."""
+        """依官方額度標頭算出重試等待時間，不做任意的快速重試。"""
         retry = _seconds(headers.get("retry-after"))
         reset = _seconds(headers.get("x-ratelimit-reset-tokens"))
         delay = retry if retry is not None else reset
