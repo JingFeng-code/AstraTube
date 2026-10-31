@@ -70,8 +70,8 @@ MESSAGES: dict[str, dict[str, str]] = {
 
     # ── 摘要 ────────────────────────────────────────────────
     "summarize.fetch_failed": {
-        "zh-Hant": "擷取失敗：{error}",
-        "en": "Could not fetch the source: {error}",
+        "zh-Hant": "無法取得這個網址的內容。請確認網址與網路後再試一次。",
+        "en": "Could not fetch the content at this URL. Check the URL and your connection, then try again.",
     },
     "summarize.all_segments_failed": {
         "zh-Hant": "摘要失敗：所有片段都無法產生，請稍後再試或換模型。",
@@ -268,10 +268,32 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "The desktop preview does not include local speech-to-text yet, so it cannot "
               "transcribe the audio. Import an SRT/VTT file you are allowed to use, then press Start.",
     },
+    "whisper.downloader_missing": {
+        "zh-Hant": "這個環境沒有安裝影片下載工具，無法下載音訊來轉錄語音。"
+                   "YouTube 影片可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "The video download tool is not installed in this environment, so the audio "
+              "cannot be downloaded for transcription. For YouTube videos, import an SRT/VTT "
+              "file you are allowed to use, then press Start.",
+    },
     "whisper.download_failed": {
-        "zh-Hant": "無法下載此影片的音訊（可能不支援、需登入或已下架）：{detail}",
-        "en": "Could not download this video's audio — it may be unsupported, "
-              "private, or taken down: {detail}",
+        "zh-Hant": "無法下載此影片的音訊（可能不支援、需登入或已下架）。"
+                   "YouTube 影片可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "Could not download this video's audio — it may be unsupported, private, or "
+              "taken down. For YouTube videos, import an SRT/VTT file you are allowed to use, "
+              "then press Start.",
+    },
+    "whisper.engine_missing": {
+        "zh-Hant": "這個環境沒有安裝語音轉錄工具，無法改用語音辨識。"
+                   "YouTube 影片可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "The speech-to-text tool is not installed in this environment, so the audio "
+              "cannot be transcribed. For YouTube videos, import an SRT/VTT file you are "
+              "allowed to use, then press Start.",
+    },
+    "whisper.transcribe_failed": {
+        "zh-Hant": "無法轉錄這段音訊，請稍後再試。"
+                   "YouTube 影片可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "Could not transcribe this audio. Try again later. For YouTube videos, import "
+              "an SRT/VTT file you are allowed to use, then press Start.",
     },
     "whisper.download_timeout": {
         "zh-Hant": "下載音訊逾時，影片可能過長或網路太慢。",

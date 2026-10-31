@@ -52,6 +52,7 @@ jobs:
           python tests/test_cloud_fallback.py
           python tests/test_settings_persistence.py
           python tests/test_desktop_transcription.py
+          python tests/test_whisper_errors.py
           python tests/test_subtitles.py
           python tests/test_imported_subtitles.py
           python tests/test_subtitle_translation.py

@@ -8,6 +8,7 @@ yt-dlp 下載音訊 → faster-whisper 轉成帶時間戳的逐字稿 → 用完
 """
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,17 @@ from app.transcript import cache
 
 _model = None
 _model_size: Optional[str] = None
+
+# python -m yt_dlp 找不到模組時的輸出，例如「python.exe: No module named yt_dlp」
+_MISSING_YT_DLP = re.compile(r"No module named '?yt_dlp")
+
+
+def _log_failure(stage: str, detail: object) -> None:
+    """原始輸出可能含本機路徑與使用者名稱，只能留在後端紀錄，不可放進給使用者的訊息。
+
+    !a 會跳脫非 ASCII 字元與換行，主控台編碼不支援時也不會在這裡再出錯。
+    """
+    print(f"[whisper] {stage}：{str(detail)[-2000:]!a}", flush=True)
 
 
 def _get_model():
@@ -40,13 +52,18 @@ def download_audio(url: str, tmpdir: str) -> str:
     cmd = [sys.executable, "-m", "yt_dlp", "-f", "bestaudio/best",
            "--no-playlist", "--no-warnings", "-o", out_tmpl, url]
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=1800)
+        # errors="replace"：輸出解碼失敗不可蓋掉下面給使用者的說明
+        subprocess.run(cmd, check=True, capture_output=True, text=True, errors="replace", timeout=1800)
     except subprocess.CalledProcessError as e:
-        msg = (e.stderr or e.stdout or "").strip().splitlines()
-        tail = msg[-1] if msg else str(e)
-        raise ValueError(messages.t("whisper.download_failed", detail=tail))
+        output = (e.stderr or e.stdout or "").strip()
+        _log_failure("音訊下載失敗", output or e.returncode)
+        key = "whisper.downloader_missing" if _MISSING_YT_DLP.search(output) else "whisper.download_failed"
+        raise ValueError(messages.t(key))
     except subprocess.TimeoutExpired:
         raise ValueError(messages.t("whisper.download_timeout"))
+    except OSError as e:
+        _log_failure("無法啟動音訊下載", e)
+        raise ValueError(messages.t("whisper.download_failed"))
     files = glob.glob(os.path.join(tmpdir, "audio.*"))
     if not files:
         raise ValueError(messages.t("whisper.audio_missing"))
@@ -55,11 +72,19 @@ def download_audio(url: str, tmpdir: str) -> str:
 
 def transcribe_file(path: str) -> Tuple[str, bool]:
     """轉寫本機音檔，回傳 (帶時間戳逐字稿, is_chinese)。"""
-    model = _get_model()
-    # beam_size=1（貪婪）較快；關閉 condition_on_previous_text 避免長音訊重複迴圈
-    segments, info = model.transcribe(path, vad_filter=True, beam_size=1,
-                                      condition_on_previous_text=False)
-    lines = [f"[{int(s.start)}] {(s.text or '').strip()}" for s in segments if (s.text or "").strip()]
+    try:
+        model = _get_model()
+        # beam_size=1（貪婪）較快；關閉 condition_on_previous_text 避免長音訊重複迴圈
+        segments, info = model.transcribe(path, vad_filter=True, beam_size=1,
+                                          condition_on_previous_text=False)
+        # segments 是惰性產生器，解碼錯誤（訊息可能含暫存檔路徑）會在這裡才發生
+        lines = [f"[{int(s.start)}] {(s.text or '').strip()}" for s in segments if (s.text or "").strip()]
+    except ModuleNotFoundError as e:
+        _log_failure("缺少語音轉錄套件", e)
+        raise ValueError(messages.t("whisper.engine_missing"))
+    except Exception as e:  # noqa: BLE001
+        _log_failure("語音轉錄失敗", e)
+        raise ValueError(messages.t("whisper.transcribe_failed"))
     text = "\n".join(lines)
     if not text:
         raise ValueError(messages.t("whisper.no_speech"))

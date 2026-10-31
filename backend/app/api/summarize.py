@@ -138,7 +138,9 @@ def _prepare(req: SummarizeRequest) -> Tuple[Content, list[str], bool, int]:
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(500, messages.t("summarize.fetch_failed", error=e))
+        # 例外內容可能含本機路徑或上游回應，只留在後端紀錄
+        print(f"[summarize] 內容擷取失敗：{e!a}", flush=True)
+        raise HTTPException(500, messages.t("summarize.fetch_failed"))
 
     chunks, skipped = _split(content, req.provider)
     return content, chunks, len(chunks) > 1, skipped
@@ -329,8 +331,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
             yield line({"type": "fatal", "error": str(e)})
             return
         except Exception as e:  # noqa: BLE001
-            yield line({"type": "fatal",
-                        "error": messages.t("summarize.fetch_failed", error=e)})
+            print(f"[summarize] 內容擷取失敗：{e!a}", flush=True)
+            yield line({"type": "fatal", "error": messages.t("summarize.fetch_failed")})
             return
 
         multi = len(chunks) > 1
