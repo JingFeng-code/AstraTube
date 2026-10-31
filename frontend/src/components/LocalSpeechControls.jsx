@@ -47,7 +47,16 @@ export default function LocalSpeechControls({ file, videoId, onDone }) {
     return () => clearInterval(timer)
   }, [job.state, videoId])
 
-  useEffect(() => { setJob({ state: 'idle', progress: 0 }); setError('') }, [videoId])
+  // 切換畫面後元件會重新掛載，但後端的工作還在跑：要接回進度和取消按鈕
+  useEffect(() => {
+    setJob({ state: 'idle', progress: 0 })
+    setError('')
+    let current = true
+    getTranscribeStatus(videoId).then(result => {
+      if (current && aliveRef.current && result.state === 'running') setJob(result)
+    }).catch(() => {})
+    return () => { current = false }
+  }, [videoId])
 
   async function downloadModel() {
     setError('')

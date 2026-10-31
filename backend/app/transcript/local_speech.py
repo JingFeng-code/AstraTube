@@ -343,6 +343,9 @@ def _run_job(video_id: str, path: Path, cancel: threading.Event) -> None:
     started = time.time()
     try:
         cues = transcribe_file(path, lambda value: _update_job(video_id, progress=value), cancel.is_set)
+        # 最後一段辨識時按下取消也要算數，不能蓋掉原本的字幕
+        if cancel.is_set():
+            raise InterruptedError
         imported_subtitles.save_cues("local", video_id, 1, "asr", cues)
         _update_job(video_id, state="done", progress=1, cue_count=len(cues))
         print(f"[speech] 完成：{len(cues)} 句，耗時 {time.time() - started:.1f}s", flush=True)

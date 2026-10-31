@@ -201,6 +201,30 @@ def test_one_job_at_a_time_and_cancel():
             assert list(folder.glob("*.video")) == []
 
 
+def test_cancel_during_last_segment_keeps_existing_subtitles():
+    release = threading.Event()
+    started = threading.Event()
+
+    def finishes_anyway(path, on_progress, cancelled):
+        started.set()
+        release.wait(2)
+        return [{"start": 0, "end": 1, "text": "新的字幕", "translation": None}]
+
+    original = [{"start": 0, "end": 1, "text": "原本的字幕", "translation": None}]
+    with TemporaryDirectory() as location:
+        folder = Path(location)
+        with patch.object(speech, "UPLOAD_DIR", folder / "tmp"), patch.object(imported, "CACHE_DIR", folder / "subs"), \
+             patch.object(speech, "_jobs", {}), patch.object(speech, "engine_available", return_value=True), \
+             patch.object(speech, "model_ready", return_value=True), patch.object(speech, "transcribe_file", side_effect=finishes_anyway):
+            imported.save_cues("local", VIDEO, 1, "srt", original)
+            asyncio.run(local_video.upload_and_transcribe(VIDEO, FakeRequest()))
+            assert started.wait(2)
+            speech.cancel_job(VIDEO)
+            release.set()
+            assert _wait(VIDEO)["state"] == "cancelled"
+            assert imported.load("local", VIDEO)["cues"][0]["text"] == "原本的字幕"
+
+
 def test_engine_errors_never_expose_paths():
     with TemporaryDirectory() as location:
         folder = Path(location)
@@ -222,5 +246,6 @@ if __name__ == "__main__":
     test_upload_transcribes_saves_and_deletes_video()
     test_upload_rejections_leave_nothing_behind()
     test_one_job_at_a_time_and_cancel()
+    test_cancel_during_last_segment_keeps_existing_subtitles()
     test_engine_errors_never_expose_paths()
     print("Local speech tests passed")
