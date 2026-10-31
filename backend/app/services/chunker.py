@@ -7,6 +7,39 @@ MAX_CHUNKS = 60  # 安全上限，避免異常超長輸入造成過多呼叫
 # 尾段小於這個比例就併回前一段：剛好超過門檻一點點的影片會切出幾百字元的碎尾段，
 # 那一段既多打一次 API，又因為內容太少只能生出空泛的卡片
 MIN_TAIL_RATIO = 0.25
+_TIMESTAMP_PREFIX = re.compile(r"\[\d+\]\s*")
+_SENTENCE_END = re.compile(r".+?(?:[。！？!?；;]+|$)", re.S)
+
+
+def _split_oversized(unit: str, limit: int, is_youtube: bool) -> list[str]:
+    """把單獨就超過上限的句子或字幕行切開，否則整段送出會超過模型額度。
+
+    先盡量切在句尾標點（中文句號後面通常沒有空白），還是太長才按字數硬切。
+    字幕行的每一段都保留開頭的 [秒數]，時間戳才不會遺失。
+    """
+    if len(unit) <= limit:
+        return [unit]
+    match = _TIMESTAMP_PREFIX.match(unit) if is_youtube else None
+    prefix = match.group(0) if match else ""
+    body = unit[len(prefix):]
+    room = max(1, limit - len(prefix))
+
+    pieces, cur = [], ""
+    for sentence in _SENTENCE_END.findall(body):
+        while len(sentence) > room:
+            if cur:
+                pieces.append(cur)
+                cur = ""
+            pieces.append(sentence[:room])
+            sentence = sentence[room:]
+        if len(cur) + len(sentence) > room:
+            pieces.append(cur)
+            cur = sentence
+        else:
+            cur += sentence
+    if cur:
+        pieces.append(cur)
+    return [prefix + piece for piece in pieces]
 
 
 def chunk_content(text: str, is_youtube: bool, chunk_chars: int = CHUNK_CHARS,
@@ -27,6 +60,8 @@ def chunk_content(text: str, is_youtube: bool, chunk_chars: int = CHUNK_CHARS,
     else:
         units = [u for u in re.split(r"(?<=[。！？!?\.])\s+", text) if u]
         sep = " "
+
+    units = [piece for u in units for piece in _split_oversized(u, chunk_chars, is_youtube)]
 
     chunks, cur = [], ""
     for u in units:
