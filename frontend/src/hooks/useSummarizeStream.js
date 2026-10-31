@@ -10,12 +10,12 @@ export default function useSummarizeStream({ initialResult = null, onSegError, o
   const [coverage, setCoverage] = useState(initialResult?.coverage_limit || null)
   const [progress, setProgress] = useState(null)
 
-  async function summarize(url, provider, deepVisual=false) {
+  async function summarize(url, provider, deepVisual=false, localName=null) {
     const u = url.trim()
     if (!u || loading) return null
     const startedAt = Date.now()
     setLoading(true); setError(''); setCoverage(null); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
-    const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, local_video_id: null, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
+    const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, local_video_id: null, local_name: localName, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
     let segsDone = 0
     let firstSegmentError = ''
     try {

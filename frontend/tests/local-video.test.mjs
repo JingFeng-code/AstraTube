@@ -19,6 +19,8 @@ test('語音模型要使用者按下才下載，兩種語言都有說明', () =>
   assert.match(controls, /onClick=\{downloadModel\}/)
   assert.doesNotMatch(controls.match(/useEffect\(\(\) => \{\s*aliveRef[\s\S]*?\}, \[\]\)/)[0], /startSpeechModelDownload/)
   assert.match(read('../src/api.js'), /X-Astra-Desktop-Token', desktop\.token/)
+  // 重新掛載時要接回進行中的工作
+  assert.match(controls, /getTranscribeStatus\(videoId\)\.then\(result => \{\s*if \(current && aliveRef\.current && result\.state === 'running'\) setJob\(result\)/)
   for (const table of Object.values(STRINGS)) {
     for (const key of ['local.speechAction', 'local.speechHint', 'local.speechRepick', 'local.speechDownload', 'local.speechDownloadHint', 'local.speechSource', 'local.speechNoEngine', 'local.speechRemote', 'source.localSpeech']) {
       assert.equal(typeof table[key], 'string', key)
