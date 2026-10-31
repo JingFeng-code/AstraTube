@@ -79,7 +79,7 @@ Windows 版以**免安裝資料夾**發行：解壓縮後雙擊 `AstraTube.exe` 
 
 - [Codespaces / Windows / WSL 開發指南](docs/DEVELOPMENT.zh-TW.md)
 - [分階段開發路線](docs/ROADMAP.md)
-- [技術稽核報告](docs/ASTRATUBE_AUDIT.zh-TW.md)・[Beta 發布門檻](docs/BETA_READINESS.zh-TW.md)・[Windows 實機驗收腳本](docs/MANUAL_SMOKE_TEST.zh-TW.md)・[常見錯誤訊息與處理](docs/TROUBLESHOOTING.zh-TW.md)
+- [技術稽核報告](docs/ASTRATUBE_AUDIT.zh-TW.md)・[Beta 發布門檻](docs/BETA_READINESS.zh-TW.md)・[Windows 實機驗收腳本](docs/MANUAL_SMOKE_TEST.zh-TW.md)・[常見錯誤訊息與處理](docs/TROUBLESHOOTING.zh-TW.md)・[平台條款風險紀錄](docs/PLATFORM_TERMS_RISK.zh-TW.md)・[本機讀畫面評估](docs/LOCAL_VISION_EVALUATION.zh-TW.md)
 - [上游原始 README](docs/UPSTREAM_README.md)
 - [第三方授權與來源](THIRD_PARTY_NOTICES.md)
 

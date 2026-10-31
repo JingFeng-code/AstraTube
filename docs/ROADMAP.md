@@ -105,4 +105,5 @@
 - [x] 本地影片入口：內建播放器播放，影片不上傳；搭配 SRT／VTT 分析
 - [x] 本機語音轉文字：SenseVoice（sherpa-onnx），只用 CPU，模型按下才下載並比對雜湊，影片處理完就刪除（[評估紀錄](LOCAL_SPEECH_EVALUATION.zh-TW.md)）
 - [ ] Windows 實機驗收與真實影片的準確度比較
-- [ ] 評估本機讀畫面（Ollama 視覺模型）
+- [x] 評估本機讀畫面（Ollama 視覺模型）：技術可行，尚未實作（[評估紀錄](LOCAL_VISION_EVALUATION.zh-TW.md)）
+- [ ] 實作本機讀畫面（選用，預設關閉）
