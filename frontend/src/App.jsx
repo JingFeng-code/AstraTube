@@ -136,7 +136,7 @@ export default function App() {
   async function startAnalysis(useVisual){
     if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}
     cardsHook.resetForNewResult()
-    await stream.summarize(isLocalMode?localUrl:url,activeProvider,useVisual)
+    await stream.summarize(isLocalMode?localUrl:url,activeProvider,useVisual,isLocalMode?localVideo?.name:null)
   }
   const handleSummarize=()=>startAnalysis(!isLocalMode&&effectiveDeepVisual(deepVisual,url))
   async function pickLocalVideo(event){
@@ -153,7 +153,8 @@ export default function App() {
   // 使用者明確按下才開啟：影片會交給 Google，不能因為有金鑰就自動改走這條路
   function analyzeWithVisual(){setDeepVisual(true);startAnalysis(true)}
   function openVisualKeySettings(){setSettingsFocus('visual-key');setShowSettings(true)}
-  const noteSource=isLocalResult?(localVideo?.name||t('input.modeLocal')):(result?.source_url||url)
+  // 記在分析結果上：之後選了別的影片，這份筆記的來源仍是當初分析的那支
+  const noteSource=isLocalResult?(result.local_name||t('input.modeLocal')):(result?.source_url||url)
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
   async function onDeepDive(i){if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
   async function handleSave(){
@@ -196,6 +197,9 @@ export default function App() {
   const errorNeedsImport=needsSubtitleImport(stream.error)
   const captionAction=errorNeedsImport?noCaptionAction(source,deepVisual,!!providers?.gemini?.configured):null
   const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
+  const localSubtitleControls=localVideo&&<SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')}/>
+  // 已分析的影片把字幕控制收進選單；選了別支影片就要直接看得到，不必先丟掉目前的重點
+  const showLocalSubtitleRow=isLocalMode&&!!localVideo&&!stream.loading&&!stream.progress&&result?.local_video_id!==localVideo.id
   const sourceForm=(
     <section className={`input-row ${compact?'input-row-compact':'input-row-home'}`} aria-label={t('input.section')}>
       {isLocalMode?<div className="url-field local-file-field">
@@ -220,6 +224,9 @@ export default function App() {
             {!errorNeedsImport&&subtitleImport}
           </div>
         </details>}
+        {isLocalMode&&localVideo&&result?.local_video_id===localVideo.id&&<details className="ai-advanced"><summary>{t('local.subtitles')}</summary>
+          <div className="ai-advanced-panel">{localSubtitleControls}</div>
+        </details>}
       </div>
     </section>
   )
@@ -240,7 +247,7 @@ export default function App() {
       {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
       {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {isLocalMode&&localVideo&&!result&&<div className="local-subtitle-row"><SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')}/></div>}
+      {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}</div>}
       {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}

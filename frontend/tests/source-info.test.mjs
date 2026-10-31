@@ -47,10 +47,16 @@ test('本地影片入口：只存識別碼，檔案不離開這台電腦', () =>
   assert.match(app, /localVideo:localVideo\?\{id:localVideo\.id,name:localVideo\.name\}:null/)
   assert.ok(STRINGS.zh['input.sourceLocal'].includes('不會上傳'))
   assert.equal(sourceHintKey('local'), 'input.sourceLocal')
+  // 筆記來源綁定分析當時的影片；已有重點時仍可管理字幕
+  assert.match(app, /noteSource=isLocalResult\?\(result\.local_name/)
+  assert.doesNotMatch(app, /noteSource=isLocalResult\?\(localVideo/)
+  assert.match(read('../src/hooks/useSummarizeStream.js'), /local_name: localName/)
+  assert.match(app, /result\?\.local_video_id!==localVideo\.id/)
+  assert.match(app, /result\?\.local_video_id===localVideo\.id&&<details/)
   const conf = readFileSync(new URL('../../desktop/src-tauri/tauri.conf.json', import.meta.url), 'utf8')
   assert.match(conf, /media-src blob:;/)
   for (const table of Object.values(STRINGS)) {
-    for (const key of ['input.modeUrl', 'input.modeLocal', 'input.sourceLocal', 'local.pick', 'local.none', 'local.repick', 'local.repickHint', 'local.playError', 'local.invalidFile', 'local.noSubtitleHint']) {
+    for (const key of ['input.modeUrl', 'input.modeLocal', 'input.sourceLocal', 'local.pick', 'local.subtitles', 'local.none', 'local.repick', 'local.repickHint', 'local.playError', 'local.invalidFile', 'local.noSubtitleHint']) {
       assert.ok(table[key], key)
     }
   }
