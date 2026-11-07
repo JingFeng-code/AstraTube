@@ -22,6 +22,7 @@ import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } fro
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
 import { isVideoFile, localVideoId, localVideoUrl } from './utils/local-video.js'
+import LocalSpeechControls from './components/LocalSpeechControls.jsx'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
@@ -146,7 +147,7 @@ export default function App() {
     if(!isVideoFile(file)){showToast(t('local.invalidFile'),true);return}
     try{
       const id=await localVideoId(file)
-      setLocalVideo(previous=>{if(previous?.src)URL.revokeObjectURL(previous.src);return{id,name:file.name,src:URL.createObjectURL(file)}})
+      setLocalVideo(previous=>{if(previous?.src)URL.revokeObjectURL(previous.src);return{id,name:file.name,src:URL.createObjectURL(file),file}})
       setSourceMode('local')
     }catch{showToast(t('local.invalidFile'),true)}
   }
@@ -197,7 +198,8 @@ export default function App() {
   const errorNeedsImport=needsSubtitleImport(stream.error)
   const captionAction=errorNeedsImport?noCaptionAction(source,deepVisual,!!providers?.gemini?.configured):null
   const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
-  const localSubtitleControls=localVideo&&<SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')}/>
+  const localSubtitleControls=localVideo&&<SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')} refreshKey={subtitleRevision}/>
+  const localSpeechControls=localVideo&&<LocalSpeechControls key={`speech-${localVideo.id}`} file={localVideo.file} videoId={localVideo.id} onDone={()=>setSubtitleRevision(v=>v+1)}/>
   // 已分析的影片把字幕控制收進選單；選了別支影片就要直接看得到，不必先丟掉目前的重點
   const showLocalSubtitleRow=isLocalMode&&!!localVideo&&!stream.loading&&!stream.progress&&result?.local_video_id!==localVideo.id
   const sourceForm=(
@@ -225,7 +227,7 @@ export default function App() {
           </div>
         </details>}
         {isLocalMode&&localVideo&&result?.local_video_id===localVideo.id&&<details className="ai-advanced"><summary>{t('local.subtitles')}</summary>
-          <div className="ai-advanced-panel">{localSubtitleControls}</div>
+          <div className="ai-advanced-panel">{localSubtitleControls}{localSpeechControls}</div>
         </details>}
       </div>
     </section>
@@ -247,7 +249,7 @@ export default function App() {
       {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
       {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}</div>}
+      {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}{localSpeechControls}</div>}
       {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}

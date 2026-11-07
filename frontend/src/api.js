@@ -76,6 +76,32 @@ export const importedSubtitleStatus = videoUrl => post('/subtitles/imported/stat
 export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batchSize=16, translationProvider='opencode') =>
   post('/subtitles/translate', {platform, video_id:videoId, page, start_index:startIndex, batch_size:batchSize, translation_provider:translationProvider})
 export const saveNote  = (payload) => post('/notes/save', payload)
+export const getSpeechStatus = () => get('/local-video/speech')
+export const startSpeechModelDownload = () => post('/local-video/speech/model', {})
+export const cancelSpeechModelDownload = () => post('/local-video/speech/model/cancel', {})
+export const getTranscribeStatus = (videoId) => get(`/local-video/${videoId}/transcribe`)
+export const cancelTranscribe = (videoId) => post(`/local-video/${videoId}/transcribe/cancel`, {})
+// 影片只傳給這台電腦上的後端。fetch 沒有上傳進度，所以這裡用 XMLHttpRequest。
+export function uploadLocalVideo(videoId, file, onProgress) {
+  const desktop = getDesktopConnection()
+  const request = new XMLHttpRequest()
+  const handle = { aborted: false, abort() { handle.aborted = true; request.abort() } }
+  handle.promise = new Promise((resolve, reject) => {
+    request.open('POST', `${desktop ? desktop.origin : BASE}/local-video/${videoId}/transcribe`)
+    request.setRequestHeader('Content-Type', 'application/octet-stream')
+    if (desktop) request.setRequestHeader('X-Astra-Desktop-Token', desktop.token)
+    request.upload.onprogress = event => { if (event.lengthComputable) onProgress?.(event.loaded / event.total) }
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) { resolve(); return }
+      let message = 'HTTP ' + request.status
+      try { message = JSON.parse(request.responseText).detail || message } catch {}
+      reject(new Error(message))
+    }
+    request.onerror = request.onabort = () => reject(new Error('Upload failed'))
+    request.send(file)
+  })
+  return handle
+}
 export async function notesStatus() {
   try { const r=await apiFetch('/notes/status'); return r.ok?r.json():{configured:false,exists:false} }
   catch { return {configured:false,exists:false,offline:true} }

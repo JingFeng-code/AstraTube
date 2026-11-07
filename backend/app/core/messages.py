@@ -308,6 +308,48 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "No recognisable speech in this audio.",
     },
 
+    # ── 本地影片語音轉文字 ───────────────────
+    "speech.local_only": {
+        "zh-Hant": "本機語音轉文字只能在影片所在的電腦上執行，遠端環境（例如 Codespaces）不會接收影片。",
+        "en": "Local speech-to-text only runs on the computer that has the video. Remote environments such as Codespaces will not accept it.",
+    },
+    "speech.invalid_id": {"zh-Hant": "本地影片識別碼無效。", "en": "The local video ID is invalid."},
+    "speech.engine_missing": {
+        "zh-Hant": "這個版本沒有內建語音轉文字引擎。",
+        "en": "This build does not include the speech-to-text engine.",
+    },
+    "speech.engine_failed": {
+        "zh-Hant": "語音轉文字失敗，請重試；如果持續發生，請重新下載語音模型。",
+        "en": "Speech-to-text failed. Try again, and download the speech model again if it keeps happening.",
+    },
+    "speech.model_missing": {"zh-Hant": "請先下載語音模型。", "en": "Download the speech model first."},
+    "speech.model_mismatch": {
+        "zh-Hant": "下載的語音模型和預期內容不符，已捨棄。請稍後再試。",
+        "en": "The downloaded speech model did not match the expected file and was discarded. Try again later.",
+    },
+    "speech.model_download_failed": {
+        "zh-Hant": "語音模型下載失敗，請確認網路後重試。",
+        "en": "Could not download the speech model. Check your connection and try again.",
+    },
+    "speech.busy": {
+        "zh-Hant": "目前正在處理另一支影片，請等它完成或先取消。",
+        "en": "Another video is being processed. Wait for it to finish or cancel it first.",
+    },
+    "speech.too_large": {"zh-Hant": "影片檔大小不符合限制。", "en": "The video file size is outside the supported range."},
+    "speech.no_disk": {
+        "zh-Hant": "硬碟空間不足：處理時需要暫存一份影片，請先釋出空間。",
+        "en": "Not enough disk space. A temporary copy of the video is needed while processing.",
+    },
+    "speech.upload_failed": {
+        "zh-Hant": "讀取影片檔失敗，請重試。",
+        "en": "Could not read the video file. Try again.",
+    },
+    "speech.no_audio": {"zh-Hant": "這支影片沒有音軌，無法轉文字。", "en": "This video has no audio track."},
+    "speech.decode_failed": {
+        "zh-Hant": "無法讀取這支影片的聲音，檔案可能損毀或格式不支援。",
+        "en": "Could not read this video's audio. The file may be damaged or unsupported.",
+    },
+
     # ── 供應商（LLM）────────────────────────────────────────
     "provider.no_key": {
         "zh-Hant": "尚未設定 {vendor} API key，請點右上角「設定」填入。",

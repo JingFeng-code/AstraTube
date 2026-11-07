@@ -45,7 +45,7 @@ test('本地影片入口：只存識別碼，檔案不離開這台電腦', () =>
   const app = read('../src/App.jsx')
   assert.match(app, /URL\.createObjectURL\(file\)/)
   assert.match(app, /localVideo:localVideo\?\{id:localVideo\.id,name:localVideo\.name\}:null/)
-  assert.ok(STRINGS.zh['input.sourceLocal'].includes('不會上傳'))
+  assert.ok(STRINGS.zh['input.sourceLocal'].includes('只在這台電腦'))
   assert.equal(sourceHintKey('local'), 'input.sourceLocal')
   // 筆記來源綁定分析當時的影片；已有重點時仍可管理字幕
   assert.match(app, /noteSource=isLocalResult\?\(result\.local_name/)

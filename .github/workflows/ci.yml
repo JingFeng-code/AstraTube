@@ -55,6 +55,7 @@ jobs:
           python tests/test_whisper_errors.py
           python tests/test_subtitles.py
           python tests/test_imported_subtitles.py
+          python tests/test_local_speech.py
           python tests/test_subtitle_translation.py
 
   frontend:

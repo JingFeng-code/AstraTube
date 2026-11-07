@@ -59,7 +59,8 @@ try {
   if (-not $hadLocal -and (Test-Path $local)) { throw "Portable build wrote to $local" }
 
   # 3a. 正常關閉：送出 WM_CLOSE（不加 /F），等同使用者按視窗的 X
-  & taskkill.exe /PID $app.Id | Out-Null
+  $closeOutput = & taskkill.exe /PID $app.Id 2>&1
+  Write-Host "taskkill: $closeOutput"
   Wait-Until { $app.HasExited } 30 "AstraTube exits after WM_CLOSE"
   Wait-Until { (Backends).Count -eq 0 } 30 "backend stops after a normal close"
   Write-Host "Normal close: no backend left"
@@ -85,6 +86,11 @@ try {
   Write-Host "Unwritable folder: window opened, backend not started"
 
   Write-Host "Portable smoke test passed"
+}
+catch {
+  Get-Process -Name "AstraTube", "astratube-backend", "msedgewebview2" -ErrorAction SilentlyContinue |
+    Select-Object Name, Id, Responding, MainWindowTitle, StartTime | Format-Table -AutoSize | Out-String | Write-Host
+  throw
 }
 finally {
   Get-Process -Name "AstraTube", "astratube-backend" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

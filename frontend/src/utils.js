@@ -14,7 +14,7 @@ export const TRANSLATION_KEYS=['translation','translated_text','zh_translation']
 export function pickField(card,keys){for(const k of keys)if(typeof card?.[k]==='string'&&card[k].trim())return card[k];return null}
 
 // meta.transcript_source → i18n key
-export const TRANSCRIPT_SOURCE_KEYS={deepsrt:'source.deepsrt','deepsrt+captions':'source.deepsrtCaptions',captions:'source.captions',whisper:'source.whisper'}
+export const TRANSCRIPT_SOURCE_KEYS={deepsrt:'source.deepsrt','deepsrt+captions':'source.deepsrtCaptions',captions:'source.captions',whisper:'source.whisper',local_speech:'source.localSpeech'}
 
 // 把 summary 字串拆成條列點（支援 •、-、換行）
 export function summaryLines(summary){

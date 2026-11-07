@@ -97,5 +97,12 @@
 - [x] 保留 Web／Codespaces 使用模式
 - [ ] Windows 免安裝版（Portable）實機 UI 驗收（自動建置與 CI 冒煙測試通過不等於實機操作）
 - [ ] 製作品質較佳的正式 App 圖示、數位簽章與更新功能
-- [ ] 增加桌面端完整 Whisper 轉錄等原生依賴（Alpha 尚未包含）
+- [ ] 增加桌面端完整 Whisper 轉錄等原生依賴（Alpha 尚未包含；本地影片已改用 SenseVoice，見下方）
 - [ ] 公開下載前的版權合規、安全與隱私稽核
+
+## Phase 5：本地影片
+
+- [x] 本地影片入口：內建播放器播放，影片不上傳；搭配 SRT／VTT 分析
+- [x] 本機語音轉文字：SenseVoice（sherpa-onnx），只用 CPU，模型按下才下載並比對雜湊，影片處理完就刪除（[評估紀錄](LOCAL_SPEECH_EVALUATION.zh-TW.md)）
+- [ ] Windows 實機驗收與真實影片的準確度比較
+- [ ] 評估本機讀畫面（Ollama 視覺模型）

@@ -68,8 +68,8 @@ def get_subtitles(
     if imported:
         cues = [dict(cue) for cue in imported["cues"]]
         is_chinese = imported["is_chinese"]
-        source = "imported"
-        timing_precision = "milliseconds_original"
+        source = "local_speech" if imported.get("format") == "asr" else "imported"
+        timing_precision = "seconds_estimated" if source == "local_speech" else "milliseconds_original"
     elif platform == "youtube":
         if not _YOUTUBE_ID.fullmatch(video_id):
             raise HTTPException(400, "YouTube 影片 ID 格式不正確。")

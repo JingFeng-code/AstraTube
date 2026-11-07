@@ -9,6 +9,10 @@ AstraTube 免安裝版（Windows x64 測試版）
    只有在確認檔案是你自己從 AstraTube 的 GitHub Actions 下載的情況下，才按「其他資訊 → 仍要執行」。
    不要為了執行而關閉防毒軟體。
 
+【本地影片語音轉文字】
+本地影片可以在這台電腦上轉文字。第一次要按下載語音模型（約 240 MB），模型存在 data 資料夾。
+處理時會在 data 資料夾暫存一份影片，完成後自動刪除，所以硬碟要留足夠空間。結果可能有錯字。
+
 【需要的環境】
 - Windows 10／11 64 位元。
 - Microsoft Edge WebView2 Runtime：Windows 11 與大多數 Windows 10 已內建。

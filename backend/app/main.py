@@ -10,6 +10,7 @@ from app.core import config  # noqa: F401  確保 .env 在最早期被載入
 from app.core import access
 from app.api.ask import router as ask_router
 from app.api.implement import router as implement_router
+from app.api.local_video import router as local_video_router
 from app.api.models import router as models_router
 from app.api.provider_connection import router as provider_connection_router
 from app.api.notes import router as notes_router
@@ -58,6 +59,7 @@ app.include_router(notes_router)
 app.include_router(settings_router)
 app.include_router(subtitles_router)
 app.include_router(subtitle_import_router)
+app.include_router(local_video_router)
 
 
 @app.get("/health")

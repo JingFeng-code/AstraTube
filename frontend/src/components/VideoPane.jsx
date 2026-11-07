@@ -253,6 +253,7 @@ export default function VideoPane({ localSrc=null, onPickLocal, videoId, startAt
         {subtitleSource === 'imported' && <p className="subtitles-hint">
           {t('subtitles.importedTiming', subtitleTiming === 'milliseconds_original')}
         </p>}
+        {subtitleSource === 'local_speech' && <p className="subtitles-hint">{t('local.speechSource')}</p>}
         <p className="subtitles-hint">{t('ai.sharedSource')}{provider ? ` · ${provider}` : ` · ${t('ai.setupRequired')}`}</p>
         {!loading && !subtitleError && cues.length>0 && <div className="subtitles-controls">
           {translating ?

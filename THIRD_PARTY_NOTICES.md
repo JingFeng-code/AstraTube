@@ -13,6 +13,15 @@
 
 Video Digest AI (https://github.com/ocean-8848/video-digest-ai) and VideoToNo (https://github.com/like-attract/video-to-note) were considered during planning. **No source code from those projects has been incorporated yet.** If that changes, update this notice and preserve their relevant license notices.
 
+## Local speech-to-text
+
+AstraTube can download these on request; the model is not included in the program:
+
+- SenseVoiceSmall (https://github.com/FunAudioLLM/SenseVoice), by FunASR / Alibaba Group, converted to ONNX by the sherpa-onnx project. Model weights are under the FunASR Model License 1.1 (https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE).
+- Silero VAD (https://github.com/snakers4/silero-vad), MIT.
+
+The desktop backend bundles sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache-2.0) and PyAV (https://github.com/PyAV-Org/PyAV, BSD-3-Clause), which includes FFmpeg libraries under their own licenses.
+
 ## Dependencies
 
 Node.js and Python dependencies remain governed by their respective package licenses. Before redistributing a packaged product, review the complete dependency and media license inventory.
