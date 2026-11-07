@@ -31,6 +31,8 @@ _MAX_GAP = 90.0             # 畫面幾乎不變時，最久多久還是記一�
 _CHANGE = 10.0              # 縮圖平均差異超過多少才算換畫面
 _STALE_FRAMES = 10.0        # 有人在說話、畫面卻這麼久沒更新，多半是視窗被縮小
 _AUDIBLE = 0.002            # 平均音量超過這個值才算有聲音；暫停時畫面不更新是正常的
+_GAP = 0.3                  # 聲音中斷超過這麼久，就補一段靜音讓語音分段在這裡斷開
+_GAP_FILL = 1.0             # 補的靜音最多幾秒：足以讓 VAD 斷句，又不會讓記憶體隨暫停時間增加
 _VISION_PROMPT = {
     "zh-Hant": "這是影片播放器目前的畫面。請用繁體中文簡短記下畫面上對理解內容有幫助的資訊："
                "投影片或標題的文字、程式碼、圖表數值、操作步驟。只有人物在說話、沒有其他資訊時，只回覆「無」。",
@@ -219,6 +221,8 @@ class Recorder:
                     self.session.cues.extend(cues)
                 vad.pop()
 
+        last_end = None
+
         try:
             while not self.stop_event.is_set():
                 data = source.read(200)
@@ -226,7 +230,16 @@ class Recorder:
                     continue
                 chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768
                 now = time.time()
-                marks.append((total, now - chunk.size / SAMPLE_RATE))
+                chunk_start = now - chunk.size / SAMPLE_RATE
+                # Windows 在目標沒有聲音時不送資料（例如暫停）。前後兩段若直接接在一起，
+                # VAD 會把它們當成同一句，後段的時間就會被算早；補一段靜音讓它在這裡斷句。
+                if last_end is not None and chunk_start - last_end > _GAP:
+                    silence = np.zeros(int(min(_GAP_FILL, chunk_start - last_end) * SAMPLE_RATE), dtype=np.float32)
+                    marks.append((total, last_end))
+                    total += silence.size
+                    pending = np.concatenate((pending, silence))
+                last_end = now
+                marks.append((total, chunk_start))
                 del marks[:-500]
                 total += chunk.size
                 self.session.last_audio_wall = now
@@ -325,11 +338,13 @@ class Recorder:
         self.session.error = message
         self.stop_event.set()
 
-    def stop(self, timeout: float = 60.0) -> None:
+    def stop(self, timeout: float = 150.0) -> bool:
+        """回傳是否全部處理完；看圖請求最久 120 秒，所以多等一點。"""
         self.stop_event.set()
         deadline = time.time() + timeout
         for thread in self.threads:
             thread.join(max(0.1, deadline - time.time()))
+        return not any(thread.is_alive() for thread in self.threads)
 
 
 def _process_audio(pid: int):
@@ -361,9 +376,10 @@ def _window_frames(pid: int, on_frame: Callable):
     hwnd = window_capture.find_main_window(pid)
     if not hwnd:
         raise RuntimeError("window not found")
-    offset = window_capture.client_offset(hwnd)
     capture = window_capture.WindowFrames(hwnd, on_frame)
-    return _Frames(capture, lambda region, width, height: window_capture.crop_box(region, offset, (width, height)))
+    # 每次都重新讀外框：使用者陪看時可能調整視窗大小或最大化
+    return _Frames(capture, lambda region, width, height: window_capture.crop_box(
+        region, window_capture.client_offset(hwnd), (width, height)))
 
 
 # ── 對外 ─────────────────────────────────────────────────
@@ -423,7 +439,12 @@ def finish() -> dict:
     session = recorder.session
     failed = session.state == "error"
     session.state = "finishing"
-    recorder.stop()
+    if not recorder.stop():
+        # 最後一段還在辨識或看圖：先不存，避免存到不完整的內容；再按一次結束就會接著等
+        session.state = "running"
+        session.error = messages.t("watch.still_processing")
+        return session.status()
+    session.error = "" if not failed else session.error
     language = config.get("OUTPUT_LANGUAGE")
     cues = sorted(({**cue, "text": to_traditional(cue["text"], language)} for cue in session.cues),
                   key=lambda cue: (cue["start"], cue["end"]))

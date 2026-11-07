@@ -179,6 +179,82 @@ def test_nothing_heard_does_not_overwrite_existing_subtitles():
         assert imported.load("youtube", YOUTUBE)["cues"][0]["text"] == "原本"
 
 
+class GappyAudio:
+    """先說話 1 秒、停 2 秒（Windows 不送資料）、再說話 1 秒。"""
+    def __init__(self):
+        self.step = 0
+
+    def read(self, _timeout):
+        self.step += 1
+        if self.step <= 5 or 16 <= self.step <= 20:
+            time.sleep(0.2)
+            return (np.ones(3200, dtype=np.int16) * 1000).tobytes()
+        time.sleep(0.2)
+        return b""
+
+    def close(self):
+        pass
+
+
+class RecordingVad(FakeVad):
+    def __init__(self):
+        super().__init__()
+        self.samples = []
+
+    def accept_waveform(self, samples):
+        self.samples.append(np.asarray(samples).copy())
+
+
+def test_audio_pause_inserts_silence_so_sentences_split():
+    vad = RecordingVad()
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}), \
+         patch.object(watch.local_speech, "new_vad", return_value=(vad, 512)):
+        watch.start("youtube", YOUTUBE, 1, REGION, 0, pid=1, models=[], audio_factory=lambda pid: GappyAudio(),
+                    recognize=lambda samples: ([], []))
+        time.sleep(4.6)
+        watch.cancel()
+    joined = np.concatenate(vad.samples)
+    zero_runs = np.flatnonzero(np.diff(np.concatenate(([0], (joined == 0).astype(int), [0]))))
+    longest = max(end - start for start, end in zip(zero_runs[::2], zero_runs[1::2]))
+    assert longest >= watch.SAMPLE_RATE * 0.9, longest  # 中間補了將近 1 秒的靜音
+
+
+def test_finish_waits_for_slow_workers_instead_of_saving_partial_results():
+    release = threading.Event()
+
+    def slow_recognize(samples):
+        release.wait(5)
+        return (list("好。"), [0.0, 0.2])
+
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}), \
+         patch.object(watch.local_speech, "new_vad", return_value=(FakeVad(), 512)):
+        watch.start("youtube", YOUTUBE, 1, REGION, 0, pid=1, models=[], audio_factory=lambda pid: FakeAudio(1),
+                    recognize=slow_recognize)
+        time.sleep(0.3)
+        recorder = watch._current["recorder"]
+        with patch.object(recorder, "stop", wraps=lambda timeout=150.0: watch.Recorder.stop(recorder, 0.2)):
+            first = watch.finish()
+        assert first["state"] == "running" and first["error"]
+        assert imported.load("youtube", YOUTUBE) is None  # 還沒處理完就不存
+        release.set()
+        second = watch.finish()
+        assert second["state"] == "done" and second["cue_count"] == 1 and not second["error"]
+
+
+def test_crop_uses_current_window_bounds():
+    calls = []
+    fake_capture = type("Cap", (), {"close": lambda self: None})()
+    from app.capture import window_capture as wc
+    with patch.object(wc, "make_dpi_aware"), patch.object(wc, "find_main_window", return_value=42), \
+         patch.object(wc, "WindowFrames", return_value=fake_capture), \
+         patch.object(wc, "client_offset", side_effect=lambda hwnd: calls.append(hwnd) or (0, 0, 1000 + 1000 * (len(calls) > 1), 800)):
+        frames = watch._window_frames(1, lambda rgb: None)
+        small = frames(REGION, 1000, 800)
+        large = frames(REGION, 2000, 800)  # 視窗被放大：外框和擷取畫面一起變寬，裁切不能再被縮放一次
+    assert calls == [42, 42]
+    assert small == large
+
+
 def test_one_session_at_a_time_and_cancel():
     with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}):
         endless = FakeAudio(1000)
@@ -226,6 +302,9 @@ if __name__ == "__main__":
     test_session_records_speech_and_frames_then_saves_for_analysis()
     test_without_vision_model_only_audio_is_recorded()
     test_nothing_heard_does_not_overwrite_existing_subtitles()
+    test_audio_pause_inserts_silence_so_sentences_split()
+    test_finish_waits_for_slow_workers_instead_of_saving_partial_results()
+    test_crop_uses_current_window_bounds()
     test_one_session_at_a_time_and_cancel()
     test_api_rejects_remote_and_bad_input()
     print("Watch-along tests passed")

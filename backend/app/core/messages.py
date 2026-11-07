@@ -361,6 +361,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "無法擷取 AstraTube 播放的聲音。需要 Windows 10（2004 版）以上；請重開 AstraTube 後再試。",
         "en": "Could not capture AstraTube's audio. Windows 10 version 2004 or later is required. Restart AstraTube and try again.",
     },
+    "watch.still_processing": {
+        "zh-Hant": "最後一段還在處理，已停止擷取。請稍等一下，再按一次「結束並分析」。",
+        "en": "The last part is still being processed and capture has stopped. Wait a moment, then press Finish again.",
+    },
     "watch.nothing_heard": {
         "zh-Hant": "沒有錄到任何說話的聲音。請確認影片有在播放，而且聲音沒有被靜音。",
         "en": "No speech was captured. Make sure the video was playing and not muted.",

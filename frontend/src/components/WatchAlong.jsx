@@ -24,17 +24,20 @@ export default function WatchAlong({ target, onFinished, onClose }) {
   const position = useRef(0)
   const [download, setDownload] = useState(null)
 
+  const runningRef = useRef(false)
+  useEffect(() => { runningRef.current = running }, [running])
+
   useEffect(() => {
     let alive = true
-    getWatchStatus().then(result => {
-      if (!alive) return
-      setSupport(result)
-      // 切換畫面再回來時，接回同一支影片進行中的陪看
-      const current = result.session
-      if (current?.state === 'running' && current.video_id === target.videoId) setSession(current)
-    }).catch(() => { if (alive) setSupport({ available: false }) })
-    return () => { alive = false }
-  }, [target.videoId])
+    getWatchStatus().then(result => { if (alive) setSupport(result) })
+      .catch(() => { if (alive) setSupport({ available: false }) })
+    return () => {
+      alive = false
+      // 換網址、切到本地影片或關掉陪看時元件會卸載：一定要停止擷取，
+      // 否則舊的錄製會在背景繼續，之後還可能把別支影片的內容存到這支影片底下
+      if (runningRef.current) cancelWatch().catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     if (!running) return

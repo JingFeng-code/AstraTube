@@ -34,6 +34,8 @@ test('陪看模式只在可用時出現，結束後沿用既有分析流程', ()
   const component = read('../src/components/WatchAlong.jsx')
   // 模型要使用者按下才下載；陪看本身不碰雲端供應商
   assert.match(component, /onClick=\{downloadModel\}/)
+  // 換影片或關掉陪看時要停止背景擷取
+  assert.match(component, /return \(\) => \{[\s\S]*?if \(runningRef\.current\) cancelWatch\(\)/)
   assert.doesNotMatch(component, /gemini|openai|anthropic/i)
   for (const table of Object.values(STRINGS)) {
     for (const key of ['watch.title', 'watch.close', 'watch.cancel', 'watch.checking', 'watch.unavailable', 'watch.needSpeech',
