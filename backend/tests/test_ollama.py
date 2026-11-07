@@ -69,6 +69,11 @@ class FakeClient:
         return self.reply if isinstance(self.reply, FakeStream) else FakeStream(self.reply)
 
 
+def chat_call(fake):
+    """查模型能力也會發 POST，所以找出真正的對話請求。"""
+    return [call for call in fake.calls if call[1].endswith("/api/chat")][0]
+
+
 def test_only_loopback_hosts():
     for host in ("http://127.0.0.1:11434","http://localhost:11434/"):
         assert ollama.validate_base_url(host).startswith("http:")
@@ -105,7 +110,7 @@ def test_provider_routing_and_no_paid_fallback():
     with patch.object(ollama.httpx,"Client",return_value=fake):
         result=llm_router.generate("ollama:qwen3:4b","影片重點","用繁體中文回答")
     assert result==("台灣繁體中文","Ollama/qwen3:4b"), "只組回 content，不含思考過程"
-    method,url,payload=fake.calls[0]
+    method,url,payload=chat_call(fake)
     assert method=="post" and url.endswith("/api/chat")
     assert payload["stream"] is True
     assert payload["model"]=="qwen3:4b"
@@ -136,7 +141,7 @@ def test_long_summary_gets_enough_context():
     fake=FakeClient(_chat_lines("ok"))
     with patch.object(ollama.httpx,"Client",return_value=fake):
         ollama.generate("字" * 12000, "系統", model="qwen3:14b")
-    assert fake.calls[0][2]["options"]["num_ctx"] == 16384
+    assert chat_call(fake)[2]["options"]["num_ctx"] == 16384
 
 
 def test_stream_errors_are_explained():
@@ -203,6 +208,35 @@ def test_status_endpoint_accepts_base_url():
     assert response.status_code==200 and response.json()["models"]==["qwen3:4b"]
 
 
+class ShowAndChatClient(FakeClient):
+    """/api/show 回報能力，/api/chat 照常串流。"""
+    def __init__(self, reply, capabilities):
+        super().__init__(reply)
+        self.capabilities = capabilities
+    def post(self, url, json=None):
+        self.calls.append(("POST", url, json))
+        return FakeResponse({"capabilities": self.capabilities})
+
+
+def test_thinking_models_answer_without_thinking():
+    for capabilities, expected in ((["completion", "thinking"], False), (["completion"], None)):
+        ollama._thinking_cache.clear()
+        fake = ShowAndChatClient(_chat_lines("完整答案"), capabilities)
+        with patch.object(ollama.httpx, "Client", return_value=fake):
+            text, _ = ollama.generate("摘要這段內容", model="qwen3.5:latest")
+        assert text == "完整答案"
+        chat = [call for call in fake.calls if call[1].endswith("/api/chat")][0][2]
+        assert chat.get("think") is expected
+
+
+def test_capability_lookup_failure_keeps_old_request():
+    ollama._thinking_cache.clear()
+    fake = FakeClient(_chat_lines("好"))  # /api/show 回傳的不是能力清單：查詢失敗
+    with patch.object(ollama.httpx, "Client", return_value=fake):
+        assert ollama.generate("問題", model="qwen3:4b")[0] == "好"
+    assert "think" not in fake.calls[-1][2]
+
+
 if __name__=="__main__":
     test_only_loopback_hosts()
     test_models_only_reflect_installed()
@@ -214,4 +248,6 @@ if __name__=="__main__":
     test_failure_status_graceful()
     test_status_for_unsaved_url_keeps_loopback_rule()
     test_status_endpoint_accepts_base_url()
+    test_thinking_models_answer_without_thinking()
+    test_capability_lookup_failure_keeps_old_request()
     print("Ollama provider tests passed")
