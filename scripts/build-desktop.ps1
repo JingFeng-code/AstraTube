@@ -10,7 +10,7 @@ if (-not $SkipInstall) {
 }
 python scripts/make_desktop_icons.py
 if ($LASTEXITCODE -ne 0) { throw "Icon generation failed" }
-python -m PyInstaller --clean --noconfirm --onefile --name astratube-backend --paths (Join-Path $root "backend") --hidden-import app.main --collect-submodules app --collect-submodules uvicorn --collect-all sherpa_onnx --collect-all av --distpath backend/dist --workpath backend/build --specpath backend/build backend/desktop_server.py
+python -m PyInstaller --clean --noconfirm --onefile --name astratube-backend --paths (Join-Path $root "backend") --hidden-import app.main --collect-submodules app --collect-submodules uvicorn --collect-all sherpa_onnx --collect-all av --collect-all windows_capture --collect-submodules comtypes --distpath backend/dist --workpath backend/build --specpath backend/build backend/desktop_server.py
 if ($LASTEXITCODE -ne 0) { throw "FastAPI PyInstaller build failed" }
 
 python scripts/smoke_desktop.py backend/dist/astratube-backend.exe

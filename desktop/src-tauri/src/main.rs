@@ -38,6 +38,11 @@ fn open_main_window(app: &tauri::App, webview_dir: &std::path::Path) -> tauri::R
         .min_inner_size(850.0, 600.0)
         .resizable(true)
         .data_directory(webview_dir.to_path_buf())
+        // 陪看模式要在視窗被擋住時繼續繪製播放器；前三項是 Tauri 原本就會帶的預設值，覆寫時要保留
+        .additional_browser_args(
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+             --disable-backgrounding-occluded-windows --disable-renderer-backgrounding",
+        )
         .build()?;
     Ok(())
 }

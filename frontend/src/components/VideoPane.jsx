@@ -10,7 +10,7 @@ const MODE_KEY = 'astratube-subtitle-mode'
 
 // YouTube 播放器放在獨立來源的 iframe（public/player/youtube.html）內，
 // 官方 IFrame API 腳本只在那個 iframe 執行，不會進入具有 Tauri IPC 的主視窗。
-function YouTubePlayer({ videoId, startAt, onTime }) {
+export function YouTubePlayer({ videoId, startAt, onTime }) {
   const frameRef = useRef(null)
   const readyRef = useRef(false)
   const seekRef = useRef(startAt)
@@ -254,6 +254,7 @@ export default function VideoPane({ localSrc=null, onPickLocal, videoId, startAt
           {t('subtitles.importedTiming', subtitleTiming === 'milliseconds_original')}
         </p>}
         {subtitleSource === 'local_speech' && <p className="subtitles-hint">{t('local.speechSource')}</p>}
+        {subtitleSource === 'watch_along' && <p className="subtitles-hint">{t('watch.subtitleSource')}</p>}
         <p className="subtitles-hint">{t('ai.sharedSource')}{provider ? ` · ${provider}` : ` · ${t('ai.setupRequired')}`}</p>
         {!loading && !subtitleError && cues.length>0 && <div className="subtitles-controls">
           {translating ?

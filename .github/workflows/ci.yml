@@ -22,7 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install fastapi 'uvicorn[standard]' python-dotenv requests beautifulsoup4 \
                       youtube-transcript-api google-genai anthropic httpx json-repair \
-                      opencc-python-reimplemented
+                      opencc-python-reimplemented numpy pillow psutil
       - name: Import check
         working-directory: backend
         run: python -c "from app.main import app; print('app imports OK')"
@@ -56,6 +56,7 @@ jobs:
           python tests/test_subtitles.py
           python tests/test_imported_subtitles.py
           python tests/test_local_speech.py
+          python tests/test_watch_along.py
           python tests/test_subtitle_translation.py
 
   frontend:

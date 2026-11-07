@@ -13,4 +13,8 @@ faster-whisper>=1.1.0
 # faster-whisper 1.2.1 搭配 PyAV 16 以上會在開檔時失敗
 av>=11,<16
 sherpa-onnx>=1.12,<2
+comtypes>=1.4; sys_platform == "win32"
+windows-capture>=2.0,<3; sys_platform == "win32"
+psutil>=5.9
+pillow>=10
 opencc-python-reimplemented

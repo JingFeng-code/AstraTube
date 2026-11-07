@@ -350,6 +350,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Could not read this video's audio. The file may be damaged or unsupported.",
     },
 
+    # ── 陪看模式 ─────────────────────────────
+    "watch.desktop_only": {
+        "zh-Hant": "陪看模式只能在 Windows 桌面版使用。",
+        "en": "Watch-along mode only works in the Windows desktop app.",
+    },
+    "watch.busy": {"zh-Hant": "已經在陪看另一支影片，請先結束。", "en": "Another video is already being watched. Finish it first."},
+    "watch.not_running": {"zh-Hant": "目前沒有進行中的陪看。", "en": "No watch-along session is running."},
+    "watch.audio_failed": {
+        "zh-Hant": "無法擷取 AstraTube 播放的聲音。需要 Windows 10（2004 版）以上；請重開 AstraTube 後再試。",
+        "en": "Could not capture AstraTube's audio. Windows 10 version 2004 or later is required. Restart AstraTube and try again.",
+    },
+    "watch.still_processing": {
+        "zh-Hant": "最後一段還在處理，已停止擷取。請稍等一下，再按一次「結束並分析」。",
+        "en": "The last part is still being processed and capture has stopped. Wait a moment, then press Finish again.",
+    },
+    "watch.nothing_heard": {
+        "zh-Hant": "沒有錄到任何說話的聲音。請確認影片有在播放，而且聲音沒有被靜音。",
+        "en": "No speech was captured. Make sure the video was playing and not muted.",
+    },
+
     # ── 供應商（LLM）────────────────────────────────────────
     "provider.no_key": {
         "zh-Hant": "尚未設定 {vendor} API key，請點右上角「設定」填入。",

@@ -14,3 +14,8 @@ json-repair>=0.30.0
 opencc-python-reimplemented
 av>=11,<16
 sherpa-onnx>=1.12,<2
+# 陪看模式：擷取 AstraTube 自己的畫面與聲音（只在 Windows 使用）
+comtypes>=1.4
+windows-capture>=2.0,<3
+psutil>=5.9
+pillow>=10

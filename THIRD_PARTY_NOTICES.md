@@ -22,6 +22,10 @@ AstraTube can download these on request; the model is not included in the progra
 
 The desktop backend bundles sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx, Apache-2.0) and PyAV (https://github.com/PyAV-Org/PyAV, BSD-3-Clause), which includes FFmpeg libraries under their own licenses.
 
+## Watch-along capture
+
+The desktop backend bundles windows-capture (https://github.com/NiiightmareXD/windows-capture, MIT) and comtypes (https://github.com/enthought/comtypes, MIT) to capture the AstraTube window and its own audio on Windows.
+
 ## Dependencies
 
 Node.js and Python dependencies remain governed by their respective package licenses. Before redistributing a packaged product, review the complete dependency and media license inventory.

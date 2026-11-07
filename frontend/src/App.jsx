@@ -22,6 +22,9 @@ import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } fro
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
 import { isVideoFile, localVideoId, localVideoUrl } from './utils/local-video.js'
+import { watchTarget } from './utils/watch.js'
+import WatchAlong from './components/WatchAlong.jsx'
+import { getWatchStatus } from './api.js'
 import LocalSpeechControls from './components/LocalSpeechControls.jsx'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
@@ -134,6 +137,11 @@ export default function App() {
   const isLocalResult=result?.source_type==='local'&&!!result?.local_video_id
   const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili||isLocalResult
 
+  // 陪看模式只在這台電腦的桌面版可用；網頁版不顯示入口
+  const [watchAvailable,setWatchAvailable]=useState(false)
+  const [watching,setWatching]=useState(false)
+  useEffect(()=>{getWatchStatus().then(r=>setWatchAvailable(!!r.available)).catch(()=>{})},[])
+  function finishWatching(){setWatching(false);startAnalysis(false)}
   async function startAnalysis(useVisual){
     if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}
     cardsHook.resetForNewResult()
@@ -189,13 +197,15 @@ export default function App() {
   useEffect(()=>{setResultTab('cards')},[result?.source_url])
   const activeTab=effectiveResultTab(resultTab,narrow)
   // 只有影片結果才鎖定版面高度、讓左右兩欄各自捲動；純文章維持整頁捲動
-  const splitLayout=!stream.loading&&!!result&&hasVideo
+  const splitLayout=!stream.loading&&!!result&&hasVideo&&!watching
 
   // 還沒有結果時以網址與開始按鈕為主；開始分析後收成一行，把空間留給影片和卡片
   const compact=!!result||stream.loading||!!stream.progress
   const source=isLocalMode?'local':detectSource(url)
   const showSourceHint=!!source&&(isLocalMode?!compact:(!compact||url.trim()!==(result?.source_url||'').trim()))
   const errorNeedsImport=needsSubtitleImport(stream.error)
+  const watchVideo=!isLocalMode&&watchAvailable?watchTarget(url):null
+  const watchOffer=watchVideo&&<div className="no-caption-option"><span>{t('watch.offer')}</span><button type="button" className="btn-paper" onClick={()=>setWatching(true)}>{t('watch.open')}</button></div>
   const captionAction=errorNeedsImport?noCaptionAction(source,deepVisual,!!providers?.gemini?.configured):null
   const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
   const localSubtitleControls=localVideo&&<SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')} refreshKey={subtitleRevision}/>
@@ -224,6 +234,7 @@ export default function App() {
               <span><strong>{t('input.deepVisual')}</strong>{bilibiliUrl&&<small id="deep-visual-note"> · {t('input.deepVisualBilibiliShort')}</small>}</span>
             </label>
             {!errorNeedsImport&&subtitleImport}
+            {watchVideo&&<button type="button" className="btn-paper watch-option" onClick={()=>setWatching(true)}>{t('watch.optionButton')}</button>}
           </div>
         </details>}
         {isLocalMode&&localVideo&&result?.local_video_id===localVideo.id&&<details className="ai-advanced"><summary>{t('local.subtitles')}</summary>
@@ -250,11 +261,11 @@ export default function App() {
       {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
       {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}{localSpeechControls}</div>}
-      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
+      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{errorNeedsImport&&watchOffer}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className={`workspace ${splitLayout?'workspace-split':''}`} data-result-tab={splitLayout&&narrow?activeTab:undefined} ref={workspaceRef}>
-        {stream.loading?<div className="loading-space" aria-hidden="true"/>
+        {watching&&watchVideo?<WatchAlong key={`${watchVideo.platform}:${watchVideo.videoId}:${watchVideo.page}`} target={watchVideo} onFinished={finishWatching} onClose={()=>setWatching(false)}/>:stream.loading?<div className="loading-space" aria-hidden="true"/>
         :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p><ol className="empty-steps"><li>{t('empty.step1')}</li><li>{t('empty.step2')}</li><li>{t('empty.step3')}</li></ol></div>
         :<>{hasVideo&&<VideoPane localSrc={localVideo?.id===result.local_video_id?localVideo.src:null} onPickLocal={()=>localPickerRef.current?.click()} videoId={isLocalResult?result.local_video_id:isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isLocalResult?'local':isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)} tabs={resultTabs(narrow)} tab={activeTab} onTabChange={setResultTab}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
       </main>

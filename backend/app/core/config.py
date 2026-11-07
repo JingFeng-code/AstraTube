@@ -44,6 +44,7 @@ _FIELDS: tuple[str, ...] = (
     "AUTO_RUN_CLI",
     "UI_LANGUAGE",
     "CLI_EFFORT",
+    "WATCH_VISION_MODEL",
 )
 
 _DEFAULT_FOLDER = "Youtube Card Reader"
