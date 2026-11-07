@@ -24,3 +24,10 @@ export const sourceHintKey = source => SOURCE_HINT_KEYS[source] || null
 
 // 後端沒有字幕時，兩種語言的錯誤訊息都會請使用者匯入 SRT／VTT
 export const needsSubtitleImport = error => /SRT/.test(String(error || ''))
+
+// 沒有字幕時還能不能改用讀畫面：只有 YouTube 能交給 Gemini。已開啟又有金鑰卻仍失敗時，就沒有下一步可提供。
+export function noCaptionAction(source, deepVisualOn, geminiConfigured) {
+  if (source !== 'youtube') return null
+  if (!geminiConfigured) return 'add-key'
+  return deepVisualOn ? null : 'enable-visual'
+}

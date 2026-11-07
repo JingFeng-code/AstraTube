@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { detectSource, needsSubtitleImport, sourceHintKey } from '../src/utils/source-info.js'
+import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } from '../src/utils/source-info.js'
 import { STRINGS } from '../src/i18n/strings.js'
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -39,6 +39,40 @@ test('只有請使用者匯入字幕的錯誤才顯示匯入按鈕', () => {
   assert.equal(needsSubtitleImport('Import an SRT/VTT file you are allowed to use.'), true)
   assert.equal(needsSubtitleImport('HTTP 429'), false)
   assert.equal(needsSubtitleImport(''), false)
+})
+
+test('沒有字幕時只有 YouTube 能改用讀畫面，缺金鑰就先引導設定', () => {
+  assert.equal(noCaptionAction('youtube', false, false), 'add-key')
+  assert.equal(noCaptionAction('youtube', true, false), 'add-key')
+  assert.equal(noCaptionAction('youtube', false, true), 'enable-visual')
+  assert.equal(noCaptionAction('youtube', true, true), null)
+  assert.equal(noCaptionAction('bilibili', false, true), null)
+  assert.equal(noCaptionAction('bilibili', false, false), null)
+  assert.equal(noCaptionAction(null, false, true), null)
+})
+
+test('讀畫面提示對齊輸入區；改用雲端要使用者按下才發生', () => {
+  const app = read('../src/App.jsx')
+  assert.match(app, /className=\{`source-hint visual-notice/)
+  assert.doesNotMatch(app, /visualNotice&&<p className="subtitles-hint"/)
+  assert.match(app, /onClick=\{analyzeWithVisual\}/)
+  assert.match(app, /function analyzeWithVisual\(\)\{setDeepVisual\(true\);startAnalysis\(true\)\}/)
+  for (const table of Object.values(STRINGS)) {
+    for (const key of ['noCaption.addKey', 'noCaption.addKeyAction', 'noCaption.enableVisual', 'noCaption.enableVisualAction', 'subtitles.importNoFileVisual']) {
+      assert.ok(table[key], key)
+    }
+    assert.match(table['noCaption.addKey'], /Google/)
+    assert.match(table['noCaption.enableVisual'], /Google/)
+  }
+})
+
+test('讀畫面的金鑰可以單獨保存，不會切換 AI 來源', () => {
+  const modal = read('../src/components/SettingsModal.jsx')
+  // 先驗證才保存；驗證失敗不能把金鑰寫進設定
+  assert.match(modal, /checkProvider\(\{ provider: 'gemini', api_key: visualKey\.trim\(\) \}\)[\s\S]*?return\s*\n\s*\}\s*\n\s*\}\s*\n\s*const next = await api\.saveSettings/)
+  assert.match(modal, /visualKey\.trim\(\) \? \{ gemini_api_key: visualKey\.trim\(\) \}/)
+  assert.doesNotMatch(modal, /setEngine\('gemini'\)/)
+  assert.doesNotMatch(modal.match(/const \[visualKey[\s\S]*?useRef\(null\)/)[0], /Provider/)
 })
 
 test('分析失敗後可以直接匯入字幕並開始，一般入口維持原樣', () => {

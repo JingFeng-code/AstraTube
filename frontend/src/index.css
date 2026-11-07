@@ -489,6 +489,9 @@ button:disabled{cursor:not-allowed}
 .error-block{width:min(100%,860px);margin:12px auto 0;padding:0 16px}
 .error-block .error-bar{width:100%;margin:0 0 8px}
 .error-block .subtitle-import-bar{padding:0}
+.visual-notice{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+.visual-notice button,.no-caption-option button{min-height:32px;font-size:13px}
+.no-caption-option{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-top:10px;color:var(--text-soft);font-size:13px;line-height:1.5}
 .empty-state{min-height:0;margin-top:clamp(20px,5vh,48px);padding:28px}
 .empty-steps{margin:18px 0 0;padding:0;list-style:none;counter-reset:step;display:flex;flex-wrap:wrap;justify-content:center;gap:10px 24px;color:var(--text-soft);font-size:14px}
 .empty-steps li{counter-increment:step;display:flex;align-items:center;gap:8px}

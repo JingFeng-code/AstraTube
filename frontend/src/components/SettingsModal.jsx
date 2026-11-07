@@ -24,7 +24,7 @@ function sourceParts(value = 'smart') {
     { engine: value.slice(0, colon), model: value.slice(colon + 1) }
 }
 
-export default function SettingsModal({ state, mandatory, onClose, onSaved, provider='smart', providers={}, onProviderChange }) {
+export default function SettingsModal({ state, mandatory, focus, onClose, onSaved, provider='smart', providers={}, onProviderChange }) {
   const { t, lang, setLang, langs } = useI18n()
   const initial = sourceParts(provider)
   const [engine, setEngine] = useState(initial.engine)
@@ -35,6 +35,9 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState('')
   const checkVersion = useRef(0)
+  const [visualKey, setVisualKey] = useState('')
+  const [advancedOpen, setAdvancedOpen] = useState(focus === 'visual-key')
+  const visualKeyRef = useRef(null)
   const [vault, setVault] = useState(state?.obsidian_vault_path || '')
   const [folder, setFolder] = useState(state?.obsidian_notes_folder || 'Youtube Card Reader')
   const [outputLanguage, setOutputLanguage] = useState(state?.output_language || 'zh-Hant')
@@ -121,6 +124,12 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
     return () => { ++checkVersion.current }
   }, [engine, state])
 
+  useEffect(() => {
+    if (focus !== 'visual-key') return
+    visualKeyRef.current?.scrollIntoView({ block: 'center' })
+    visualKeyRef.current?.focus()
+  }, [focus])
+
   async function handleSave() {
     if (saveBlocked) return
     setErr('')
@@ -137,10 +146,20 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
       ollama_base_url: ollamaUrl.trim() || 'http://127.0.0.1:11434',
       output_language: outputLanguage,
       // 保留原有金鑰；只在驗證成功且使用者確認儲存時寫入新金鑰。
+      ...(visualKey.trim() ? { gemini_api_key: visualKey.trim() } : {}),
       ...(typedKey.trim() && verified ? { [keyField]: typedKey.trim() } : {}),
     }
     setSaving(true)
     try {
+      // 讀畫面的金鑰和 AI 來源分開：這裡只驗證並保存金鑰，不會切換摘要與問答用的 AI
+      if (visualKey.trim()) {
+        try {
+          await api.checkProvider({ provider: 'gemini', api_key: visualKey.trim() })
+        } catch (e) {
+          setErr(t('settings.visualKeyInvalid', e.message))
+          return
+        }
+      }
       const next = await api.saveSettings(payload)
       onProviderChange?.(isSmart ? 'smart' : changing ? chosenSource : provider)
       onSaved?.(next)
@@ -234,8 +253,16 @@ export default function SettingsModal({ state, mandatory, onClose, onSaved, prov
             <span className="settings-hint">{t('settings.outputLanguageHint')}</span>
           </label>
 
-          <details className="settings-advanced">
+          <details className="settings-advanced" open={advancedOpen} onToggle={e=>setAdvancedOpen(e.currentTarget.open)}>
             <summary>{t('ai.advancedTools')}</summary>
+            <div className="settings-divider"><span>{t('input.deepVisual')}</span></div>
+            <label className="settings-field">
+              <span className="settings-label">{t('settings.visualKey')}</span>
+              <input ref={visualKeyRef} type="password" autoComplete="off" spellCheck={false}
+                value={visualKey} onChange={e=>setVisualKey(e.target.value)}
+                placeholder={state?.gemini_set ? t('settings.keySet', state?.gemini_preview || '••••') : t('settings.keyPlaceholder')} />
+              <span className="settings-hint">{t('settings.visualKeyHint')}</span>
+            </label>
             <div className="settings-divider"><span>{t('settings.obsidian')}</span></div>
             <label className="settings-field">
               <span className="settings-label">{t('settings.vault')}</span>
