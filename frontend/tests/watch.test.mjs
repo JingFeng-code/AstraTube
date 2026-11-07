@@ -48,4 +48,8 @@ test('陪看模式只在可用時出現，結束後沿用既有分析流程', ()
     assert.match(table['watch.visionModel']('qwen'), /qwen/)
   }
   assert.match(STRINGS.zh['watch.intro'], /不會下載影片/)
+  // 可以陪看時，沒有字幕檔的提示要指向陪看，不能說「目前無法分析」
+  assert.match(app, /noFileHint=\{watchVideo\?t\('subtitles\.importNoFileWatch'\)/)
+  for (const table of Object.values(STRINGS)) assert.equal(typeof table['subtitles.importNoFileWatch'], 'string')
+  assert.match(STRINGS.zh['subtitles.importNoFileWatch'], /陪看模式/)
 })

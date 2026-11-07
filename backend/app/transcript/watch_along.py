@@ -347,6 +347,30 @@ class Recorder:
         return not any(thread.is_alive() for thread in self.threads)
 
 
+def audio_pid(pid: int) -> int:
+    """找出實際播放聲音的程式。
+
+    桌面版的畫面由 WebView2 負責，聲音從它的瀏覽器程序（以及底下的音訊程序）播出。
+    雖然 WebView2 看起來是 AstraTube 的子程序，Windows 錄程序聲音時卻不把它算進
+    AstraTube 的程序樹，直接錄 AstraTube 只會錄到靜音；所以改錄 AstraTube 底下的
+    WebView2 瀏覽器程序（不帶 --type= 參數的那一個）。找不到時（例如開發時直接指定
+    瀏覽器）就用原本的程式編號。
+    """
+    try:
+        import psutil
+        for child in psutil.Process(pid).children():
+            try:
+                if child.name().lower() != "msedgewebview2.exe":
+                    continue
+                if not any(arg.startswith("--type=") for arg in child.cmdline()):
+                    return child.pid
+            except psutil.Error:
+                continue
+    except Exception as exc:  # noqa: BLE001
+        local_speech._log("找不到 WebView2 程序，改錄主程式", exc)
+    return pid
+
+
 def _process_audio(pid: int):
     sys.coinit_flags = 0  # comtypes 在匯入的執行緒用 MTA，聲音啟用的回呼才不需要訊息迴圈
     import comtypes
@@ -355,7 +379,7 @@ def _process_audio(pid: int):
     except OSError:
         pass
     from app.capture.process_loopback import ProcessLoopback
-    return ProcessLoopback(pid, SAMPLE_RATE)
+    return ProcessLoopback(audio_pid(pid), SAMPLE_RATE)
 
 
 class _Frames:

@@ -263,10 +263,11 @@ MESSAGES: dict[str, dict[str, str]] = {
     },
     # ── 本機轉寫 ────────────────────────────────────────────
     "whisper.unavailable_desktop": {
-        "zh-Hant": "桌面測試版尚未內建本機語音轉錄，無法改用語音辨識。"
-                   "可以匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
-        "en": "The desktop preview does not include local speech-to-text yet, so it cannot "
-              "transcribe the audio. Import an SRT/VTT file you are allowed to use, then press Start.",
+        "zh-Hant": "桌面版不會下載線上影片的聲音來轉成文字。"
+                   "可以用陪看模式邊播放邊在這台電腦記下聲音，或匯入你有權使用的 SRT／VTT 字幕檔後再按「開始」。",
+        "en": "The desktop app does not download online video audio for transcription. "
+              "Use watch-along mode to record it on this computer while it plays, or import an "
+              "SRT/VTT file you are allowed to use, then press Start.",
     },
     "whisper.downloader_missing": {
         "zh-Hant": "這個環境沒有安裝影片下載工具，無法下載音訊來轉錄語音。"
