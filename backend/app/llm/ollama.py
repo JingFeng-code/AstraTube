@@ -100,6 +100,23 @@ def connection_status(url: str | None = None) -> dict:
                 "無法連線到本機 Ollama。請確認 Ollama 已啟動，且與 AstraTube 後端位於同一環境。"}
 
 
+_thinking_cache: dict[tuple[str, str], bool] = {}
+
+
+def supports_thinking(name: str) -> bool:
+    """模型是否會先「思考」再回答；查不到時當作不會，維持原本的請求內容。"""
+    key = (base_url(), name)
+    if key not in _thinking_cache:
+        try:
+            with httpx.Client(timeout=httpx.Timeout(5.0), trust_env=False, follow_redirects=False) as client:
+                response = client.post(base_url() + "/api/show", json={"model": name})
+                response.raise_for_status()
+                _thinking_cache[key] = "thinking" in (response.json().get("capabilities") or [])
+        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
+            return False
+    return _thinking_cache[key]
+
+
 def _selected_model(model: str) -> str:
     name = model.strip() if model else default_model()
     if name:
@@ -138,6 +155,10 @@ def generate_messages(messages: list[dict], system: str = "", model: str = "",
         raise ProviderError("Ollama 請求內容不可為空。")
     payload = {"model": name, "messages": payload_messages, "stream": True,
                "options": {"num_ctx": context_size(payload_messages)}}
+    # 會思考的模型（例如 qwen3.5）預設先輸出大量思考內容，和答案共用上下文額度，
+    # 長逐字稿的摘要因此常被截斷。這裡的工作都是照著素材整理，關掉思考換取完整輸出與速度。
+    if supports_thinking(name):
+        payload["think"] = False
     parts: list[str] = []
     finished = False
     done_reason = None
