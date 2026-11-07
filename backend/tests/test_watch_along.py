@@ -255,6 +255,41 @@ def test_crop_uses_current_window_bounds():
     assert small == large
 
 
+class FakeProc:
+    def __init__(self, pid, name, args=(), children=(), broken=False):
+        self.pid, self._name, self._args, self._children, self._broken = pid, name, list(args), list(children), broken
+
+    def name(self):
+        if self._broken:
+            import psutil
+            raise psutil.AccessDenied(self.pid)
+        return self._name
+
+    def cmdline(self):
+        return self._args
+
+    def children(self):
+        return self._children
+
+
+def test_audio_is_recorded_from_the_webview2_browser_process():
+    import psutil
+    # 實機發現：錄 AstraTube 主程式只會錄到靜音，要錄它底下的 WebView2 瀏覽器程序
+    tree = FakeProc(100, "AstraTube.exe", children=[
+        FakeProc(101, "astratube-backend.exe"),
+        FakeProc(102, "msedgewebview2.exe", broken=True),
+        FakeProc(103, "msedgewebview2.exe", ["msedgewebview2.exe", "--type=renderer"]),
+        FakeProc(104, "msedgewebview2.exe", ["msedgewebview2.exe", "--embedded-browser-webview=1"]),
+    ])
+    with patch.object(psutil, "Process", return_value=tree):
+        assert watch.audio_pid(100) == 104
+    # 開發時直接指定瀏覽器：沒有 WebView2 子程序，就錄原本的程式
+    with patch.object(psutil, "Process", return_value=FakeProc(200, "msedge.exe")):
+        assert watch.audio_pid(200) == 200
+    with patch.object(psutil, "Process", side_effect=psutil.NoSuchProcess(300)):
+        assert watch.audio_pid(300) == 300
+
+
 def test_one_session_at_a_time_and_cancel():
     with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}):
         endless = FakeAudio(1000)
@@ -305,6 +340,7 @@ if __name__ == "__main__":
     test_audio_pause_inserts_silence_so_sentences_split()
     test_finish_waits_for_slow_workers_instead_of_saving_partial_results()
     test_crop_uses_current_window_bounds()
+    test_audio_is_recorded_from_the_webview2_browser_process()
     test_one_session_at_a_time_and_cancel()
     test_api_rejects_remote_and_bad_input()
     print("Watch-along tests passed")
