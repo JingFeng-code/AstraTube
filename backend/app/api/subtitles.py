@@ -54,7 +54,7 @@ def parse_timed_cues(text: str) -> list[dict]:
 
 @router.get("")
 def get_subtitles(
-    platform: str = Query(..., pattern="^(youtube|bilibili)$"),
+    platform: str = Query(..., pattern="^(youtube|bilibili|local)$"),
     video_id: str = Query(..., max_length=20),
     page: int = Query(1, ge=1, le=1000),
     translation_provider: str = "opencode",
@@ -84,6 +84,8 @@ def get_subtitles(
                 status = 404 if error.kind in ("missing", "unavailable") else 503
                 raise HTTPException(status, str(error)) from exc
             text, is_chinese = local
+    elif platform == "local":
+        raise HTTPException(404, "這支本地影片還沒有字幕，請先匯入 SRT／VTT 字幕檔。")
     elif not imported:
         if not _BILIBILI_ID.fullmatch(video_id):
             raise HTTPException(400, "Bilibili BV 影片 ID 格式不正確。")
@@ -125,7 +127,7 @@ def get_subtitles(
 
 
 class TranslateRequest(BaseModel):
-    platform: Literal["youtube", "bilibili"]
+    platform: Literal["youtube", "bilibili", "local"]
     video_id: str = Field(min_length=1, max_length=20)
     page: int = Field(default=1, ge=1, le=1000)
     start_index: int = Field(default=0, ge=0, le=5999)

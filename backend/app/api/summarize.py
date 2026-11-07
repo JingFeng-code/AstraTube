@@ -297,6 +297,7 @@ def summarize(req: SummarizeRequest) -> dict:
             "source_type": content["type"],
             "source_url": req.url, "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
             "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
+            "local_video_id": content.get("video_id") if content["type"] == "local" else None,
             "bilibili_page": content.get("bilibili_page"),
             "transcript_source": content.get("transcript_source"),
             "content_type": _pick_content_type(content_types),
@@ -340,6 +341,7 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
         yield line({"type": "meta", "source_type": content["type"], "source_url": req.url,
                     "youtube_video_id": content.get("video_id") if content["type"] == "youtube" else None,
             "bilibili_video_id": content.get("video_id") if content["type"] == "bilibili" else None,
+            "local_video_id": content.get("video_id") if content["type"] == "local" else None,
             "bilibili_page": content.get("bilibili_page"),
                     "transcript_source": content.get("transcript_source"),
                     "segments": len(chunks), "workers": workers})

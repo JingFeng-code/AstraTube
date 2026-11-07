@@ -20,7 +20,7 @@ export default function CardDeck({ result, index, setIndex, clippedIds, onClip, 
   if (!card) return null
   const transcript=pickField(card,TRANSCRIPT_KEYS), translation=pickField(card,TRANSLATION_KEYS)
   const points=summaryLines(card.summary)
-  const isClipped=clippedIds.has(index), dive=deepdives[index], isYT=result.source_type==='youtube'||result.source_type==='bilibili'
+  const isClipped=clippedIds.has(index), dive=deepdives[index], isYT=['youtube','bilibili','local'].includes(result.source_type)
   // 舊的工作階段（localStorage）沒有 content_type，defaultTrack 會退回 study
   const suggestedTrack=defaultTrack(result.content_type,hasCode(cards))
   const sourceKey=result.transcript_source&&TRANSCRIPT_SOURCE_KEYS[result.transcript_source]

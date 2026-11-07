@@ -21,6 +21,7 @@ import { DEEP_VISUAL_KEY, deepVisualNotice, effectiveDeepVisual, isBilibiliUrl }
 import { detectSource, needsSubtitleImport, noCaptionAction, sourceHintKey } from './utils/source-info.js'
 import { createNoteMarkdown, markdownFilename } from './utils/notes-export.js'
 import { NARROW_QUERY, effectiveResultTab, resultTabs } from './utils/result-tabs.js'
+import { isVideoFile, localVideoId, localVideoUrl } from './utils/local-video.js'
 
 // 本機工作階段持久化：整理結果、卡片索引、筆記草稿都存在瀏覽器裡，重開仍在。
 const SKEY='ycr-session-v1'
@@ -70,6 +71,10 @@ function GenerationProgress({ progress }){
 export default function App() {
   const { t } = useI18n()
   const [url,setUrl]=useState(SAVED.url||'')
+  const [sourceMode,setSourceMode]=useState(SAVED.sourceMode==='local'?'local':'url')
+  // 影片檔只保留在記憶體；重新開啟 App 後只記得識別碼和名稱，要再選一次檔案才能播放
+  const [localVideo,setLocalVideo]=useState(()=>SAVED.localVideo?.id?{id:SAVED.localVideo.id,name:SAVED.localVideo.name||'',src:null}:null)
+  const localPickerRef=useRef(null)
   const [provider,setProvider]=useState(()=>initialAiSource(readPreference('astratube-ai-source'),SAVED.provider))
   const [deepVisual,setDeepVisualRaw]=useState(()=>readPreference(DVKEY)==='1')
   const setDeepVisual=v=>{setDeepVisualRaw(v);try{localStorage.setItem(DVKEY,v?'1':'0')}catch{}}
@@ -106,8 +111,8 @@ export default function App() {
   useEffect(()=>{ if(result?.title) setFilename(f=>f||result.title) },[result?.title])
   // 工作階段持久化：任何整理狀態改變就寫回 localStorage
   useEffect(()=>{
-    try{localStorage.setItem(SKEY,JSON.stringify({url,provider,result,index:cardsHook.index,deepdives:cardsHook.deepdives,clips:cardsHook.clips,freeNote,filename,saveOpts:notes.saveOpts}))}catch{}
-  },[url,provider,result,cardsHook.index,cardsHook.deepdives,cardsHook.clips,freeNote,filename,notes.saveOpts])
+    try{localStorage.setItem(SKEY,JSON.stringify({url,sourceMode,localVideo:localVideo?{id:localVideo.id,name:localVideo.name}:null,provider,result,index:cardsHook.index,deepdives:cardsHook.deepdives,clips:cardsHook.clips,freeNote,filename,saveOpts:notes.saveOpts}))}catch{}
+  },[url,sourceMode,localVideo?.id,localVideo?.name,provider,result,cardsHook.index,cardsHook.deepdives,cardsHook.clips,freeNote,filename,notes.saveOpts])
 
   function handleSettingsSaved(next){
     setSettings(next)
@@ -120,31 +125,47 @@ export default function App() {
 
   // Bilibili 不支援讀畫面：停用勾選框並說明原因（不改動使用者對 YouTube 的偏好設定）
   const bilibiliUrl=isBilibiliUrl(url)
-  const visualNotice=deepVisualNotice(deepVisual,url,!!providers?.gemini?.configured)
+  const isLocalMode=sourceMode==='local'
+  const localUrl=localVideo?localVideoUrl(localVideo.id):''
+  const visualNotice=isLocalMode?null:deepVisualNotice(deepVisual,url,!!providers?.gemini?.configured)
   const cards=result?.cards||[]
   const isBilibili=result?.source_type==='bilibili'&&!!result?.bilibili_video_id
-  const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili
+  const isLocalResult=result?.source_type==='local'&&!!result?.local_video_id
+  const hasVideo=(result?.source_type==='youtube'&&!!result?.youtube_video_id)||isBilibili||isLocalResult
 
   async function startAnalysis(useVisual){
     if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}
     cardsHook.resetForNewResult()
-    await stream.summarize(url,activeProvider,useVisual)
+    await stream.summarize(isLocalMode?localUrl:url,activeProvider,useVisual,isLocalMode?localVideo?.name:null)
   }
-  const handleSummarize=()=>startAnalysis(effectiveDeepVisual(deepVisual,url))
+  const handleSummarize=()=>startAnalysis(!isLocalMode&&effectiveDeepVisual(deepVisual,url))
+  async function pickLocalVideo(event){
+    const file=event.target.files?.[0]
+    event.target.value=''
+    if(!file)return
+    if(!isVideoFile(file)){showToast(t('local.invalidFile'),true);return}
+    try{
+      const id=await localVideoId(file)
+      setLocalVideo(previous=>{if(previous?.src)URL.revokeObjectURL(previous.src);return{id,name:file.name,src:URL.createObjectURL(file)}})
+      setSourceMode('local')
+    }catch{showToast(t('local.invalidFile'),true)}
+  }
   // 使用者明確按下才開啟：影片會交給 Google，不能因為有金鑰就自動改走這條路
   function analyzeWithVisual(){setDeepVisual(true);startAnalysis(true)}
   function openVisualKeySettings(){setSettingsFocus('visual-key');setShowSettings(true)}
+  // 記在分析結果上：之後選了別的影片，這份筆記的來源仍是當初分析的那支
+  const noteSource=isLocalResult?(result.local_name||t('input.modeLocal')):(result?.source_url||url)
   function clipCard(i){const c=cardsHook.clipCard(i); if(c)showToast(t('toast.clipped',c.heading))}
   async function onDeepDive(i){if(!activeProvider){setShowSettings(true);showToast(t('ai.notReady'),true);return}try{await cardsHook.handleDeepDive(i)}catch(e){showToast(t('toast.deepdiveFailed',e.message),true)}}
   async function handleSave(){
     try{
-      const res=await notes.save({title:filename||result?.title||t('note.summary'),sourceUrl:result?.source_url||url,clips:cardsHook.clips,freeNote,t})
+      const res=await notes.save({title:filename||result?.title||t('note.summary'),sourceUrl:noteSource,clips:cardsHook.clips,freeNote,t})
       showToast(res.mode==='append'?t('toast.appendedTo',res.saved_to):t('toast.savedTo',res.saved_to))
     }catch(e){showToast(e.message===t('error.pickNote')?e.message:t('toast.saveFailed',e.message),true)}
   }
 
   function handleExportNotes(){
-    const markdown=createNoteMarkdown({title:filename||result?.title||t('note.summary'),sourceUrl:result?.source_url||url,clips:cardsHook.clips,freeNote})
+    const markdown=createNoteMarkdown({title:filename||result?.title||t('note.summary'),sourceUrl:noteSource,clips:cardsHook.clips,freeNote})
     const blob=new Blob([markdown],{type:'text/markdown;charset=utf-8'})
     const href=URL.createObjectURL(blob)
     const element=document.createElement('a')
@@ -171,20 +192,30 @@ export default function App() {
 
   // 還沒有結果時以網址與開始按鈕為主；開始分析後收成一行，把空間留給影片和卡片
   const compact=!!result||stream.loading||!!stream.progress
-  const source=detectSource(url)
-  const showSourceHint=!!source&&(!compact||url.trim()!==(result?.source_url||'').trim())
+  const source=isLocalMode?'local':detectSource(url)
+  const showSourceHint=!!source&&(isLocalMode?!compact:(!compact||url.trim()!==(result?.source_url||'').trim()))
   const errorNeedsImport=needsSubtitleImport(stream.error)
   const captionAction=errorNeedsImport?noCaptionAction(source,deepVisual,!!providers?.gemini?.configured):null
   const subtitleImport=<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)}/>
+  const localSubtitleControls=localVideo&&<SubtitleImportControls key={localVideo.id} videoUrl={localUrl} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={t('local.noSubtitleHint')}/>
+  // 已分析的影片把字幕控制收進選單；選了別支影片就要直接看得到，不必先丟掉目前的重點
+  const showLocalSubtitleRow=isLocalMode&&!!localVideo&&!stream.loading&&!stream.progress&&result?.local_video_id!==localVideo.id
   const sourceForm=(
     <section className={`input-row ${compact?'input-row-compact':'input-row-home'}`} aria-label={t('input.section')}>
-      <label className="url-field">
+      {isLocalMode?<div className="url-field local-file-field">
+        <button type="button" className="btn-paper" onClick={()=>localPickerRef.current?.click()}>{t('local.pick')}</button>
+        <span className="local-file-name" title={localVideo?.name||''}>{localVideo?.name||t('local.none')}</span>
+      </div>:<label className="url-field">
         <input type="url" placeholder={t('input.placeholder')} aria-label={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
-      </label>
-      <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
+      </label>}
+      <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress||(isLocalMode&&!localVideo)}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
       <div className="input-options">
+        <div className="source-mode" role="group" aria-label={t('input.section')}>
+          <button type="button" aria-pressed={!isLocalMode} className={isLocalMode?'':'active'} onClick={()=>setSourceMode('url')}>{t('input.modeUrl')}</button>
+          <button type="button" aria-pressed={isLocalMode} className={isLocalMode?'active':''} onClick={()=>setSourceMode('local')}>{t('input.modeLocal')}</button>
+        </div>
         <button className="btn-paper" type="button" onClick={()=>setShowSettings(true)} title={t('ai.choose')}>{t('ai.source')}: {aiSourceLabel(provider,activeProvider,t)}</button>
-        <details className="ai-advanced"><summary>{t('ai.advancedAnalysis')}</summary>
+        {!isLocalMode&&<details className="ai-advanced"><summary>{t('ai.advancedAnalysis')}</summary>
           <div className="ai-advanced-panel">
             <label className="deep-visual-toggle" title={bilibiliUrl?t('input.deepVisualBilibili'):t('input.deepVisualTitle')}>
               <input type="checkbox" checked={deepVisual&&!bilibiliUrl} disabled={bilibiliUrl} aria-describedby={bilibiliUrl?'deep-visual-note':undefined} onChange={e=>setDeepVisual(e.target.checked)}/>
@@ -192,7 +223,10 @@ export default function App() {
             </label>
             {!errorNeedsImport&&subtitleImport}
           </div>
-        </details>
+        </details>}
+        {isLocalMode&&localVideo&&result?.local_video_id===localVideo.id&&<details className="ai-advanced"><summary>{t('local.subtitles')}</summary>
+          <div className="ai-advanced-panel">{localSubtitleControls}</div>
+        </details>}
       </div>
     </section>
   )
@@ -209,16 +243,18 @@ export default function App() {
         <button className="btn-gear" onClick={()=>setShowSettings(true)}>{t('topbar.settings')}</button>
       </header>
       {!compact&&sourceForm}
+      <input ref={localPickerRef} type="file" accept="video/*,.mkv,.mov,.m4v,.avi" hidden onChange={pickLocalVideo} aria-label={t('local.pick')}/>
       {showSourceHint&&<p className={`source-hint ${compact?'source-hint-compact':''}`} role="status">{t(sourceHintKey(source))}</p>}
       {visualNotice&&<p className={`source-hint visual-notice ${compact?'source-hint-compact':''}`} role="status"><span>{t(visualNotice==='gemini'?'ai.deepVisualGemini':'ai.deepVisualNoKey')}</span>{visualNotice==='no-key'&&<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>}</p>}
       <GenerationProgress progress={stream.progress}/>
-      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
+      {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}</div>}
+      {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className={`workspace ${splitLayout?'workspace-split':''}`} data-result-tab={splitLayout&&narrow?activeTab:undefined} ref={workspaceRef}>
         {stream.loading?<div className="loading-space" aria-hidden="true"/>
         :!result?<div className="empty-state"><span className="empty-logo"><BrandMark/><strong>{t('app.name')}</strong></span><p className="empty-tagline">{t('app.tagline')}</p><ol className="empty-steps"><li>{t('empty.step1')}</li><li>{t('empty.step2')}</li><li>{t('empty.step3')}</li></ol></div>
-        :<>{hasVideo&&<VideoPane videoId={isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)} tabs={resultTabs(narrow)} tab={activeTab} onTabChange={setResultTab}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
+        :<>{hasVideo&&<VideoPane localSrc={localVideo?.id===result.local_video_id?localVideo.src:null} onPickLocal={()=>localPickerRef.current?.click()} videoId={isLocalResult?result.local_video_id:isBilibili?result.bilibili_video_id:result.youtube_video_id} platform={isLocalResult?'local':isBilibili?'bilibili':'youtube'} page={result.bilibili_page||1} provider={activeProvider} subtitleRevision={subtitleRevision} startAt={cardsHook.startAt} cards={cards} activeIndex={cardsHook.index} onJump={i=>cardsHook.jumpToCard(i,true)} tabs={resultTabs(narrow)} tab={activeTab} onTabChange={setResultTab}/>}{hasVideo&&<Splitter onCommit={setSplit}/>}<CardDeck result={result} index={cardsHook.index} setIndex={cardsHook.setIndex} clippedIds={cardsHook.clippedIds} onClip={clipCard} onJumpVideo={i=>cardsHook.jumpToCard(i,true)} deepdives={cardsHook.deepdives} onDeepDive={onDeepDive} deepdiveLoading={cardsHook.ddLoading} onImplement={implement.start} fullWidth={!hasVideo} /></>}
       </main>
       {/* 筆記／問模型：可最小化浮窗，不佔用主版面，展開/收合狀態記在 localStorage */}
       {result&&<>
@@ -226,7 +262,7 @@ export default function App() {
           <NotesPanel onExport={handleExportNotes} vault={notes.vault} clips={cardsHook.clips} onClipNoteChange={cardsHook.updateClipNote} onRemoveClip={cardsHook.removeClip} freeNote={freeNote} setFreeNote={setFreeNote} filename={filename} setFilename={setFilename} onSave={handleSave} saving={notes.saving} folders={notes.folders} noteFiles={notes.noteFiles} saveOpts={notes.saveOpts} onSaveOptsChange={notes.onSaveOptsChange}/>
         </FloatingPanel>
         <FloatingPanel id="ask" corner="bl" title={t('panel.ask')}>
-          <AskPanel provider={activeProvider} videoId={result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
+          <AskPanel provider={activeProvider} videoId={result?.local_video_id?`local:${result.local_video_id}`:result?.youtube_video_id||(result?.bilibili_video_id?`bilibili:${result.bilibili_video_id}:p${result.bilibili_page||1}`:null)}/>
         </FloatingPanel>
       </>}
       {implement.open&&<ImplementModal state={implement} providers={providers} selectedProvider={activeProvider} onClose={implement.close} onToast={showToast}/>}
