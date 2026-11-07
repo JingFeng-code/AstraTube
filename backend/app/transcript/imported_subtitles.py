@@ -142,9 +142,17 @@ def parse_subtitle_file(filename: str, content: str) -> tuple[str, list[dict]]:
     return suffix[1:], cues
 
 
-def transcript_from_cues(cues: list[dict]) -> str:
-    """沿用現有摘要與問答的逐字稿契約，不改動既有模型 prompt。"""
-    return "\n".join(f"[{int(cue['start'])}] {cue['text']}" for cue in cues)
+def transcript_from_cues(cues: list[dict], visuals: list[dict] | None = None) -> str:
+    """沿用現有摘要與問答的逐字稿契約；陪看模式的畫面筆記用【畫面 分:秒】插在對應時間。"""
+    lines = [(cue["start"], 1, f"[{int(cue['start'])}] {cue['text']}") for cue in cues]
+    for item in visuals or []:
+        second = int(item["t"])
+        lines.append((item["t"], 0, f"【畫面 {second // 60}:{second % 60:02d}】{item['text']}"))
+    return "\n".join(line for _, _, line in sorted(lines, key=lambda row: (row[0], row[1])))
+
+
+def source_label(stored: dict) -> str:
+    return {"asr": "local_speech", "watch": "watch_along"}.get(stored.get("format"), "imported_subtitles")
 
 
 def save(platform: str, video_id: str, page: int, filename: str, content: str) -> dict:
@@ -152,8 +160,9 @@ def save(platform: str, video_id: str, page: int, filename: str, content: str) -
     return save_cues(platform, video_id, page, fmt, cues)
 
 
-def save_cues(platform: str, video_id: str, page: int, fmt: str, cues: list[dict]) -> dict:
-    """fmt 是 srt／vtt，本機語音轉文字產生的字幕則是 asr。"""
+def save_cues(platform: str, video_id: str, page: int, fmt: str, cues: list[dict],
+              visuals: list[dict] | None = None) -> dict:
+    """fmt 是 srt／vtt；本機語音轉文字是 asr；陪看模式是 watch，另外帶畫面筆記。"""
     path = _file_path(platform, video_id, page)
     # 只根據字幕內容猜測；不會將全部原文強制簡繁轉換。
     total = sum(len(cue["text"]) for cue in cues)
@@ -161,6 +170,7 @@ def save_cues(platform: str, video_id: str, page: int, fmt: str, cues: list[dict
     payload = {
         "format": fmt, "cues": cues, "is_chinese": chinese > total * 0.2,
         "version": 1, "platform": platform, "video_id": video_id, "page": page,
+        "visuals": [{"t": float(item["t"]), "text": str(item["text"])} for item in visuals or []],
     }
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     # 原子替換，避免程式中斷時把之前成功匯入的字幕寫壞。

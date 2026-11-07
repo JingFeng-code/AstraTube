@@ -29,13 +29,13 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     local = re.fullmatch(r"local:([0-9a-f]{16})", video_id)
     if local:
         uploaded = imported_subtitles.load("local", local.group(1))
-        return imported_subtitles.transcript_from_cues(uploaded["cues"]) if uploaded else None
+        return imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals")) if uploaded else None
     match = re.fullmatch(r"bilibili:(BV[0-9A-Za-z]{10}):p([1-9][0-9]{0,2})", video_id)
     if match:
         bvid, page = match.group(1), int(match.group(2))
         uploaded = imported_subtitles.load("bilibili", bvid, page)
         if uploaded:
-            return imported_subtitles.transcript_from_cues(uploaded["cues"])
+            return imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals"))
         cached = cache.get(bilibili.transcript_cache_key(bvid, page))
         if cached:
             return cached[0]
@@ -46,7 +46,7 @@ def _load_transcript(video_id: Optional[str]) -> Optional[str]:
     if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
         uploaded = imported_subtitles.load("youtube", video_id)
         if uploaded:
-            return imported_subtitles.transcript_from_cues(uploaded["cues"])
+            return imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals"))
     for key in (f"deepsrt_v1:{video_id}", video_id):
         hit = cache.get(key)
         if hit and hit[0].strip():

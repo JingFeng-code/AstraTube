@@ -219,6 +219,27 @@ def _get_recognizer():
         return _recognizer
 
 
+def new_vad():
+    """回傳 (VAD, 每次要餵的樣本數)；本地影片和陪看模式共用同一組設定。"""
+    import sherpa_onnx
+    settings = sherpa_onnx.VadModelConfig()
+    settings.silero_vad.model = str(MODEL_DIR / "silero_vad.onnx")
+    settings.silero_vad.min_silence_duration = 0.25
+    settings.silero_vad.max_speech_duration = _MAX_SPEECH_SECONDS
+    settings.sample_rate = SAMPLE_RATE
+    return (sherpa_onnx.VoiceActivityDetector(settings, buffer_size_in_seconds=_MAX_SPEECH_SECONDS * 3),
+            settings.silero_vad.window_size)
+
+
+def recognize(samples) -> tuple[list[str], list[float]]:
+    """辨識一段已切好的語音，回傳字元與相對時間。"""
+    recognizer = _get_recognizer()
+    stream = recognizer.create_stream()
+    stream.accept_waveform(SAMPLE_RATE, samples)
+    recognizer.decode_stream(stream)
+    return list(stream.result.tokens), list(stream.result.timestamps)
+
+
 def _pcm_chunks(container, stream) -> Iterator:
     import av
     resampler = av.AudioResampler(format="flt", layout="mono", rate=SAMPLE_RATE)
@@ -233,16 +254,10 @@ def transcribe_file(path: Path, on_progress: Callable[[float], None], cancelled:
     """解碼影片音軌並逐段辨識；邊讀邊處理，長影片也不會把整段音訊放進記憶體。"""
     import av
     import numpy as np
-    import sherpa_onnx
 
     try:
         recognizer = _get_recognizer()
-        settings = sherpa_onnx.VadModelConfig()
-        settings.silero_vad.model = str(MODEL_DIR / "silero_vad.onnx")
-        settings.silero_vad.min_silence_duration = 0.25
-        settings.silero_vad.max_speech_duration = _MAX_SPEECH_SECONDS
-        settings.sample_rate = SAMPLE_RATE
-        vad = sherpa_onnx.VoiceActivityDetector(settings, buffer_size_in_seconds=_MAX_SPEECH_SECONDS * 3)
+        vad, window = new_vad()
     except Exception as exc:  # noqa: BLE001
         _log("語音模型載入失敗", exc)
         raise SpeechError(messages.t("speech.engine_failed")) from exc
@@ -252,13 +267,9 @@ def transcribe_file(path: Path, on_progress: Callable[[float], None], cancelled:
     def drain() -> None:
         while not vad.empty():
             segment = vad.front
-            stream = recognizer.create_stream()
-            stream.accept_waveform(SAMPLE_RATE, segment.samples)
-            recognizer.decode_stream(stream)
-            result = stream.result
+            tokens, stamps = recognize(segment.samples)
             offset = segment.start / SAMPLE_RATE
-            cues.extend(build_cues(list(result.tokens), list(result.timestamps), offset,
-                                   offset + len(segment.samples) / SAMPLE_RATE))
+            cues.extend(build_cues(tokens, stamps, offset, offset + len(segment.samples) / SAMPLE_RATE))
             vad.pop()
 
     try:
@@ -267,7 +278,6 @@ def transcribe_file(path: Path, on_progress: Callable[[float], None], cancelled:
                 raise SpeechError(messages.t("speech.no_audio"))
             audio = container.streams.audio[0]
             total = (container.duration or 0) / av.time_base
-            window = settings.silero_vad.window_size
             pending = np.zeros(0, dtype=np.float32)
             heard = 0
             for chunk in _pcm_chunks(container, audio):

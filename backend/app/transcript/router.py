@@ -116,9 +116,8 @@ def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: boo
         uploaded = imported_subtitles.load("local", local_id)
         if not uploaded:
             raise ValueError("這支本地影片還沒有字幕，請先匯入 SRT／VTT 字幕檔，或使用本機語音轉文字。")
-        return _pack("local", local_id, imported_subtitles.transcript_from_cues(uploaded["cues"]),
-                     uploaded["is_chinese"],
-                     "local_speech" if uploaded.get("format") == "asr" else "imported_subtitles")
+        return _pack("local", local_id, imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals")),
+                     uploaded["is_chinese"], imported_subtitles.source_label(uploaded))
 
     bili = bilibili.parse_video_url(url)
     if bili:
@@ -128,8 +127,8 @@ def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: boo
         uploaded = imported_subtitles.load("bilibili", bvid, page)
         if uploaded:
             result = _pack("bilibili", bvid,
-                           imported_subtitles.transcript_from_cues(uploaded["cues"]),
-                           uploaded["is_chinese"], "imported_subtitles")
+                           imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals")),
+                           uploaded["is_chinese"], imported_subtitles.source_label(uploaded))
             result["bilibili_page"] = page
             return result
         text, is_chinese = bilibili.fetch_transcript(bvid, page)
@@ -145,8 +144,8 @@ def route_content(url: str, deep_visual: bool = False, allow_cloud_fallback: boo
         uploaded = imported_subtitles.load("youtube", video_id, 1)
         if uploaded and not deep_visual:
             return _pack("youtube", video_id,
-                         imported_subtitles.transcript_from_cues(uploaded["cues"]),
-                         uploaded["is_chinese"], "imported_subtitles")
+                         imported_subtitles.transcript_from_cues(uploaded["cues"], uploaded.get("visuals")),
+                         uploaded["is_chinese"], imported_subtitles.source_label(uploaded))
         return _youtube(url, video_id, deep_visual, allow_cloud_fallback)
 
     try:

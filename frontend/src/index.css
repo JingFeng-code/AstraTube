@@ -497,6 +497,16 @@ button:disabled{cursor:not-allowed}
 .local-file-name{min-width:0;overflow:hidden;color:var(--text-soft);font-size:14px;text-overflow:ellipsis;white-space:nowrap}
 .local-subtitle-row{width:min(100%,860px);margin:10px auto 0;padding:0 16px}
 .local-subtitle-row .subtitle-import-bar{padding:0}
+.watch-along{display:flex;flex-direction:column;gap:10px;width:min(100%,900px);margin:16px auto;padding:0 16px}
+.watch-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:16px}
+.watch-head button,.watch-controls button{min-height:34px;font-size:13px}
+.watch-frame{width:100%}
+.watch-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.watch-live{font-size:14px;font-weight:750;color:var(--text)}
+.watch-hint{margin:0;color:var(--text-faint);font-size:13px;line-height:1.55}
+.watch-recent{display:flex;flex-direction:column;gap:4px;margin:0;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface);list-style:none;font-size:13px;line-height:1.5}
+.watch-recent span{display:inline-block;min-width:52px;margin-right:6px;color:var(--text-faint);font-family:var(--mono)}
+.watch-option{min-height:34px;font-size:13px}
 .local-speech{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:13px}
 .local-speech button{min-height:32px;font-size:13px}
 .local-speech-hint{flex-basis:100%;margin:0;color:var(--text-faint);font-size:13px;line-height:1.5}
