@@ -167,6 +167,31 @@ def test_without_vision_model_only_audio_is_recorded():
         assert result["state"] == "done" and result["visual_count"] == 0
 
 
+def test_user_picks_vision_model_or_turns_it_off():
+    models = ["llava:7b", "qwen3.5:latest"]
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}), \
+         patch.object(watch.local_speech, "new_vad", return_value=(FakeVad(), 512)):
+        # 選了第二個模型就用第二個，不再固定挑第一個
+        status = watch.start("youtube", YOUTUBE, 1, REGION, 0, vision_model="qwen3.5:latest", pid=1, models=models,
+                             audio_factory=lambda pid: FakeAudio(0), frames_factory=FakeFrames,
+                             recognize=lambda samples: ([], []), describe=lambda model, picture: "")
+        assert status["vision_model"] == "qwen3.5:latest" and "audible" in status
+        watch.cancel()
+        # 只記聲音：不看畫面，也不顯示「沒有看圖模型」的提醒
+        status = watch.start("youtube", YOUTUBE, 1, REGION, 0, use_vision=False, pid=1, models=models,
+                             audio_factory=lambda pid: FakeAudio(0), recognize=lambda samples: ([], []))
+        assert status["vision_model"] is None and "no_vision_model" not in status["warnings"]
+        watch.cancel()
+        # 不在本機看圖模型清單裡（例如雲端模型）就拒絕，不偷偷換成別的模型
+        try:
+            watch.start("youtube", YOUTUBE, 1, REGION, 0, vision_model="gpt-4o:cloud", pid=1, models=models)
+        except ValueError as exc:
+            assert "gpt-4o:cloud" in str(exc)
+        else:
+            raise AssertionError("unknown vision model must be rejected")
+        assert watch.status()["state"] != "running"
+
+
 def test_nothing_heard_does_not_overwrite_existing_subtitles():
     with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}):
         imported.save_cues("youtube", YOUTUBE, 1, "srt", [{"start": 0, "end": 1, "text": "原本", "translation": None}])
@@ -336,6 +361,7 @@ if __name__ == "__main__":
     test_transcript_interleaves_visual_notes_and_labels_the_source()
     test_session_records_speech_and_frames_then_saves_for_analysis()
     test_without_vision_model_only_audio_is_recorded()
+    test_user_picks_vision_model_or_turns_it_off()
     test_nothing_heard_does_not_overwrite_existing_subtitles()
     test_audio_pause_inserts_silence_so_sentences_split()
     test_finish_waits_for_slow_workers_instead_of_saving_partial_results()

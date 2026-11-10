@@ -78,6 +78,7 @@ export const translateSubtitles = (platform, videoId, page=1, startIndex=0, batc
 export const saveNote  = (payload) => post('/notes/save', payload)
 export const getSpeechStatus = () => get('/local-video/speech')
 export const getWatchStatus = () => get('/watch/status')
+export const getWatchVisionModels = () => get('/watch/vision-models')
 export const startWatch = (payload) => post('/watch/start', payload)
 export const sendWatchHeartbeat = (position) => post('/watch/heartbeat', { position })
 export const updateWatchRegion = (region) => post('/watch/region', region)

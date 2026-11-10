@@ -1,6 +1,8 @@
 // 主視窗與隔離播放器（public/player/youtube.html）之間的訊息橋接。
 // 安全重點：只接受來自「我們建立的那個 iframe」、正確來源、正確隨機頻道的訊息，
 // 而且內容只能是 ready／time／error 三種、數值必須有限且在合理範圍內。
+// time 可以附帶播放狀態，只接受下列幾種，其他值一律當作沒有。
+const PLAYER_STATES = new Set(['playing', 'paused', 'ended', 'buffering', 'idle'])
 
 export const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/
 export const MAX_SECONDS = 360000
@@ -41,7 +43,7 @@ export function parsePlayerMessage(event, expected) {
   if (data.type === 'time') {
     const seconds = data.seconds
     if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0 || seconds > MAX_SECONDS) return null
-    return { type: 'time', seconds }
+    return PLAYER_STATES.has(data.state) ? { type: 'time', seconds, state: data.state } : { type: 'time', seconds }
   }
   return null
 }

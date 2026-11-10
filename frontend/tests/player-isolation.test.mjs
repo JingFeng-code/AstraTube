@@ -31,6 +31,9 @@ test('主視窗只接受來自自己 iframe、正確來源與頻道的訊息', (
   const ok = data => ({ source: frame, origin: HOST, data: { channel: CHANNEL, ...data } })
   assert.deepEqual(parsePlayerMessage(ok({ type: 'ready' }), expected), { type: 'ready' })
   assert.deepEqual(parsePlayerMessage(ok({ type: 'time', seconds: 12.5 }), expected), { type: 'time', seconds: 12.5 })
+  // 播放狀態只接受固定幾種，其他值當作沒有
+  assert.deepEqual(parsePlayerMessage(ok({ type: 'time', seconds: 3, state: 'paused' }), expected), { type: 'time', seconds: 3, state: 'paused' })
+  assert.deepEqual(parsePlayerMessage(ok({ type: 'time', seconds: 3, state: '<script>' }), expected), { type: 'time', seconds: 3 })
   assert.deepEqual(parsePlayerMessage(ok({ type: 'error', reason: 'api' }), expected), { type: 'error' })
   // 其他視窗（例如 YouTube 內層 iframe 或惡意 frame）送來的訊息
   assert.equal(parsePlayerMessage({ ...ok({ type: 'time', seconds: 1 }), source: {} }, expected), null)

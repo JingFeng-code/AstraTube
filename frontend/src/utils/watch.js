@@ -41,3 +41,26 @@ export function formatClock(seconds) {
   const rest = String(total % 60).padStart(2, '0')
   return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`
 }
+
+// 看畫面的模型：VISION_OFF 代表只記聲音。
+// 優先順序：上次選的 → 上方「AI 來源」選的本機模型（剛好能看圖時）→ 清單第一個。
+// 清單只有本機已安裝、能看圖的 Ollama 模型，雲端模型不會出現在這裡。
+export const VISION_OFF = 'off'
+export function pickVisionModel(models, saved, provider) {
+  const list = Array.isArray(models) ? models : []
+  if (saved === VISION_OFF) return VISION_OFF
+  if (saved && list.includes(saved)) return saved
+  const current = typeof provider === 'string' && provider.startsWith('ollama:') ? provider.slice(7) : ''
+  if (current && list.includes(current)) return current
+  return list[0] || VISION_OFF
+}
+
+// 陪看時要讓使用者一眼看出「現在有沒有在記錄」。
+// YouTube 有播放狀態可用；Bilibili 讀不到，改看最近有沒有聽到聲音。
+export function watchPhase({ platform, playerState, audible }) {
+  if (platform === 'youtube') {
+    if (playerState === 'playing') return 'recording'
+    return ['paused', 'ended', 'buffering'].includes(playerState) ? playerState : 'waiting'
+  }
+  return audible ? 'recording' : 'quiet'
+}

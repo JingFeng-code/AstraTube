@@ -356,6 +356,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "zh-Hant": "陪看模式只能在 Windows 桌面版使用。",
         "en": "Watch-along mode only works in the Windows desktop app.",
     },
+    "watch.model_missing": {
+        "zh-Hant": "找不到看畫面的模型「{model}」。請確認它已安裝在這台電腦的 Ollama，而且支援看圖，或改選其他模型。",
+        "en": "The vision model \"{model}\" was not found. Make sure it is installed in Ollama on this computer and supports images, or choose another model.",
+    },
     "watch.busy": {"zh-Hant": "已經在陪看另一支影片，請先結束。", "en": "Another video is already being watched. Finish it first."},
     "watch.not_running": {"zh-Hant": "目前沒有進行中的陪看。", "en": "No watch-along session is running."},
     "watch.audio_failed": {
@@ -363,8 +367,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Could not capture AstraTube's audio. Windows 10 version 2004 or later is required. Restart AstraTube and try again.",
     },
     "watch.still_processing": {
-        "zh-Hant": "最後一段還在處理，已停止擷取。請稍等一下，再按一次「結束並分析」。",
-        "en": "The last part is still being processed and capture has stopped. Wait a moment, then press Finish again.",
+        "zh-Hant": "最後一段還在處理，已停止擷取。請稍等一下，再按一次「完成並整理重點」。",
+        "en": "The last part is still being processed and capture has stopped. Wait a moment, then press \"Finish and build cards\" again.",
     },
     "watch.nothing_heard": {
         "zh-Hant": "沒有錄到任何說話的聲音。請確認影片有在播放，而且聲音沒有被靜音。",

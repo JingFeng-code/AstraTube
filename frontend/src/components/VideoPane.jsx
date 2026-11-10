@@ -62,7 +62,7 @@ export function YouTubePlayer({ videoId, startAt, onTime }) {
         const next = seekRef.current
         if (next.t > 0 || next.auto) sendSeek(next)
       } else if (message.type === 'time') {
-        onTimeRef.current(message.seconds)
+        onTimeRef.current(message.seconds, message.state)
       } else {
         window.clearTimeout(timer)
         setFallback(true)
@@ -228,7 +228,7 @@ export default function VideoPane({ localSrc=null, onPickLocal, videoId, startAt
         {platform === 'local' ?
           <LocalPlayer src={localSrc} startAt={seek} onTime={setTime} onPickAgain={onPickLocal} /> :
         platform === 'youtube' ?
-          <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={setTime} /> :
+          <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={seconds => setTime(seconds)} /> :
           <iframe key={`${startAt.key}:${manualSeek.key}`} src={biliSrc} title="Bilibili"
             allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
         {/* Bilibili 讀不到播放進度，其他來源才能把字幕對到畫面上；不攔截滑鼠，不影響播放器操作 */}

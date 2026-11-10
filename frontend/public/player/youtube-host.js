@@ -6,13 +6,20 @@
 // 這個頁面放在另一個來源（桌面版為 astraplayer 自訂協定），與主視窗只透過下列
 // 已驗證的 postMessage 溝通：
 //   主視窗 → 本頁：{channel, type:'seek', seconds, play}
-//   本頁 → 主視窗：{channel, type:'ready'} / {channel, type:'time', seconds} / {channel, type:'error', reason}
+//   本頁 → 主視窗：{channel, type:'ready'} / {channel, type:'time', seconds, state} / {channel, type:'error', reason}
+//   state 是播放狀態（playing／paused／ended／buffering／idle），陪看模式用來顯示有沒有在記錄
 // 本檔不 import 任何東西，方便直接被 Node 測試載入。
 
 export const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/
 export const CHANNEL = /^[A-Za-z0-9]{16,64}$/
 export const MAX_SECONDS = 360000
 const ALLOWED_PARENT_PROTOCOLS = new Set(['http:', 'https:', 'tauri:'])
+// YouTube IFrame API 的播放狀態代碼：-1 未開始、0 播完、1 播放中、2 暫停、3 緩衝、5 已載入
+const STATES = { '-1': 'idle', 0: 'ended', 1: 'playing', 2: 'paused', 3: 'buffering', 5: 'idle' }
+
+export function stateName(code) {
+  return STATES[code] || 'idle'
+}
 
 /** 從本頁網址讀出設定；任何欄位不合法就回傳 null（不嘗試修正）。 */
 export function readConfig(href) {
@@ -60,6 +67,10 @@ export function start(win = window) {
   let player = null
   let ready = false
   let pending = null
+  const report = () => {
+    const current = player?.getCurrentTime?.()
+    if (Number.isFinite(current)) send({ type: 'time', seconds: current, state: stateName(player.getPlayerState?.()) })
+  }
 
   function apply(command) {
     if (!ready || !player) { pending = command; return }
@@ -83,11 +94,10 @@ export function start(win = window) {
           ready = true
           send({ type: 'ready' })
           if (pending) { const next = pending; pending = null; apply(next) }
-          win.setInterval(() => {
-            const current = player.getCurrentTime?.()
-            if (Number.isFinite(current)) send({ type: 'time', seconds: current })
-          }, 400)
+          win.setInterval(report, 400)
         },
+        // 暫停、播完時立刻回報，不必等下一次定時回報
+        onStateChange: report,
         onError: () => send({ type: 'error', reason: 'player' }),
       },
     })
