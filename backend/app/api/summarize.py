@@ -8,6 +8,7 @@ from typing import Any, Callable, Iterator, Tuple
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import iterate_in_threadpool
 from json_repair import repair_json
 
 from app.core import config, messages
@@ -314,6 +315,25 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
     seg_error 但不中斷，致命錯誤發 fatal 後結束。內容擷取移入 generator，
     讓前端能在字幕與文章擷取開始時立即顯示真實工作階段。
     """
+    stream = _stream_events(req)
+
+    async def body():
+        try:
+            async for chunk in iterate_in_threadpool(stream):
+                yield chunk
+        finally:
+            # 使用者按「停止」時連線中斷，伺服器會取消這裡；要主動關閉 generator，
+            # 它才會取消排隊中的段落。光是不再讀取，背景排好的段落仍會一段段呼叫模型。
+            try:
+                stream.close()
+            except ValueError:
+                pass  # 正在背景執行緒裡跑；心跳讓它最多 0.5 秒就回來，之後不會再被呼叫
+
+    return StreamingResponse(body(), media_type="application/x-ndjson")
+
+
+def _stream_events(req: SummarizeRequest) -> Iterator[str]:
+    """產生串流事件。使用者按「停止」時前端會中斷連線，伺服器隨即關閉這個 generator。"""
     def line(obj: dict) -> str:
         return json.dumps(obj, ensure_ascii=False) + "\n"
 
@@ -368,7 +388,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 try:
                     yield line(events.get(timeout=0.5))
                 except Empty:
-                    continue
+                    # 心跳（空字串，前端會略過）：讓伺服器每 0.5 秒有機會發現使用者已經按了停止
+                    yield ""
             while True:
                 try:
                     yield line(events.get_nowait())
@@ -400,7 +421,8 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 event["truncated"] = True
             yield line(event)
 
-        with ThreadPoolExecutor(max_workers=workers) as ex:
+        ex = ThreadPoolExecutor(max_workers=workers)
+        try:
             # 第一段優先：不和後段搶免費 API；完成並送到前端後，才平行跑剩餘段落。
             first = ex.submit(_run_segment, req, content, chunks[0], 0, multi, report(0))
             yield from wait_and_emit(0, first)
@@ -413,13 +435,18 @@ def summarize_stream(req: SummarizeRequest) -> StreamingResponse:
                 yield from wait_and_emit(i, f)
                 if fatal_error:
                     return
+        finally:
+            # 使用者按「停止」（連線中斷、generator 被關閉）或發生致命錯誤時：
+            # 取消還在排隊的段落，不再呼叫模型；已經在跑的那段無法中斷，會在背景做完。
+            # 不等待（wait=False），以免關閉 generator 時卡住伺服器。
+            ex.shutdown(wait=False, cancel_futures=True)
         yield line({"type": "done", "title": title or messages.t("summarize.untitled"),
                     "model_used": "、".join(models_used), "segments": len(chunks),
                     "content_type": _pick_content_type(content_types),
                     "failed_segments": failed, "total_cards": total,
                     "skipped_segments": skipped})
 
-    return StreamingResponse(gen(), media_type="application/x-ndjson")
+    return gen()
 
 
 @router.post("/deepdive")
