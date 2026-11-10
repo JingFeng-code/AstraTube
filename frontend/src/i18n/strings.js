@@ -126,6 +126,10 @@ export const STRINGS = {
     'watch.subtitleSource': 'Created by watch-along with local speech-to-text and may contain mistakes.',
     'source.watchAlong': 'Watch-along',
     'input.running': 'Working…',
+    'input.stop': 'Stop',
+    'input.stopHint': 'Stop this run; cards already generated are kept',
+    'input.stopped': 'Stopped.',
+    'input.stoppedPartial': 'Stopped. The cards below were generated before you stopped.',
 
     'progress.source': 'Fetching source',
     'progress.generate': 'Extracting cards',
@@ -500,6 +504,10 @@ export const STRINGS = {
     'watch.subtitleSource': '字幕由陪看模式的本機語音轉文字產生，可能有錯字。',
     'source.watchAlong': '陪看模式',
     'input.running': '整理中',
+    'input.stop': '停止',
+    'input.stopHint': '停止這次整理，已經產生的知識卡會保留',
+    'input.stopped': '已停止整理。',
+    'input.stoppedPartial': '已停止整理，下面是停止前已經產生的知識卡。',
 
     'progress.source': '讀取來源',
     'progress.generate': '整理重點',

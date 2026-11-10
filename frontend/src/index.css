@@ -129,6 +129,9 @@ button:disabled{cursor:not-allowed}
 .btn-go:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
 .btn-go:active:not(:disabled){transform:scale(.98)}
 .btn-go:disabled{opacity:.58}
+/* 整理中同一個位置變成「停止」：外框色，避免和主要按鈕混淆 */
+.btn-go.btn-stop{background:var(--surface);color:var(--danger);border-color:var(--danger);box-shadow:none}
+.btn-go.btn-stop:hover{background:var(--accent-soft);border-color:var(--danger)}
 .error-bar{width:min(100%,1396px);margin:0 auto 10px;padding:11px 16px;border-left:3px solid var(--danger);background:var(--accent-soft);color:var(--danger);font-size:13px}
 .generation-progress{width:min(calc(100% - 32px),1396px);margin:0 auto 12px}
 .generation-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;color:var(--text-faint);font:700 12px/1.3 var(--mono);font-variant-numeric:tabular-nums}

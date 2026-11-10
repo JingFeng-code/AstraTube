@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import * as api from '../api.js'
 import { coverageNotice } from '../utils.js'
 
@@ -9,11 +9,17 @@ export default function useSummarizeStream({ initialResult = null, onSegError, o
   const [error, setError] = useState('')
   const [coverage, setCoverage] = useState(initialResult?.coverage_limit || null)
   const [progress, setProgress] = useState(null)
+  // 使用者按「停止」：中斷這次請求，已經產生的知識卡保留
+  const [stopped, setStopped] = useState(false)
+  const controllerRef = useRef(null)
 
   async function summarize(url, provider, deepVisual=false, localName=null) {
     const u = url.trim()
     if (!u || loading) return null
     const startedAt = Date.now()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    setStopped(false)
     setLoading(true); setError(''); setCoverage(null); setResult(null); setProgress({ stage: 'source', completed: 0, total: 0, startedAt })
     const draft = { title: '', source_type: '', source_url: u, youtube_video_id: null, bilibili_video_id: null, bilibili_page: null, local_video_id: null, local_name: localName, cards: [], model_used: '', segments: 0, transcript_source: null, content_type: 'other' }
     let segsDone = 0
@@ -56,15 +62,21 @@ export default function useSummarizeStream({ initialResult = null, onSegError, o
           draft.content_type = ev.content_type || draft.content_type
           setResult({ ...draft }); setProgress(null)
         }
-      })
-      if (!draft.cards.length) setError(firstSegmentError ? `${t('error.noCards')} · ${firstSegmentError}` : t('error.noCards'))
+      }, controller.signal)
+      if (!draft.cards.length && !controller.signal.aborted) setError(firstSegmentError ? `${t('error.noCards')} · ${firstSegmentError}` : t('error.noCards'))
     } catch (e) {
-      setError(t('error.generate', e.message))
+      if (controller.signal.aborted) {
+        setStopped(true)
+        if (draft.cards.length) setResult({ ...draft })
+      } else setError(t('error.generate', e.message))
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null
       setLoading(false); setProgress(null)
     }
     return draft
   }
 
-  return { result, setResult, loading, error, notice: coverageNotice(coverage, t), progress, summarize }
+  function stop() { controllerRef.current?.abort() }
+
+  return { result, setResult, loading, error, notice: coverageNotice(coverage, t), progress, summarize, stop, stopped }
 }
