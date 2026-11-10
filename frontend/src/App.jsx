@@ -220,7 +220,7 @@ export default function App() {
       </div>:<label className="url-field">
         <input type="url" placeholder={t('input.placeholder')} aria-label={t('input.placeholder')} value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSummarize()}/>
       </label>}
-      <button className="btn-go" onClick={handleSummarize} disabled={stream.loading||!!stream.progress||(isLocalMode&&!localVideo)}>{(stream.progress||stream.loading)?t('input.running'):t('input.go')}</button>
+      {(stream.progress||stream.loading)?<button type="button" className="btn-go btn-stop" onClick={stream.stop} title={t('input.stopHint')}>{t('input.stop')}</button>:<button className="btn-go" onClick={handleSummarize} disabled={isLocalMode&&!localVideo}>{t('input.go')}</button>}
       <div className="input-options">
         <div className="source-mode" role="group" aria-label={t('input.section')}>
           <button type="button" aria-pressed={!isLocalMode} className={isLocalMode?'':'active'} onClick={()=>setSourceMode('url')}>{t('input.modeUrl')}</button>
@@ -263,6 +263,7 @@ export default function App() {
       {showLocalSubtitleRow&&<div className="local-subtitle-row">{localSubtitleControls}{localSpeechControls}</div>}
       {stream.error&&<div className="error-block"><p className="error-bar">{stream.error}</p>{errorNeedsImport&&!isLocalMode&&<SubtitleImportControls videoUrl={url} onChanged={()=>setSubtitleRevision(v=>v+1)} onAnalyze={handleSummarize} noFileHint={watchVideo?t('subtitles.importNoFileWatch'):captionAction?t('subtitles.importNoFileVisual'):undefined}/>}{errorNeedsImport&&watchOffer}{captionAction&&<div className="no-caption-option"><span>{t(captionAction==='add-key'?'noCaption.addKey':'noCaption.enableVisual')}</span>{captionAction==='add-key'?<button type="button" className="btn-paper" onClick={openVisualKeySettings}>{t('noCaption.addKeyAction')}</button>:<button type="button" className="btn-paper" onClick={analyzeWithVisual}>{t('noCaption.enableVisualAction')}</button>}</div>}</div>}
       {stream.notice&&<p className="error-bar" role="status">{stream.notice}</p>}
+      {stream.stopped&&<p className="error-bar" role="status">{t(result?.cards?.length?'input.stoppedPartial':'input.stopped')}</p>}
       {/* 有影片時左右並排；純文章來源則讓重點區佔滿 */}
       <main className={`workspace ${splitLayout?'workspace-split':''}`} data-result-tab={splitLayout&&narrow?activeTab:undefined} ref={workspaceRef}>
         {watching&&watchVideo?<WatchAlong key={`${watchVideo.platform}:${watchVideo.videoId}:${watchVideo.page}`} target={watchVideo} onFinished={finishWatching} onClose={()=>setWatching(false)}/>:stream.loading?<div className="loading-space" aria-hidden="true"/>

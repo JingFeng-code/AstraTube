@@ -31,6 +31,7 @@ jobs:
         run: |
           python tests/test_deepsrt.py
           python tests/test_progress_stream.py
+          python tests/test_stop_stream.py
           python tests/test_providers.py
           python tests/test_explicit_provider.py
           python tests/test_provider_connection.py
