@@ -27,6 +27,8 @@ class StartRequest(BaseModel):
     page: int = Field(default=1, ge=1, le=1000)
     region: Region
     offset: float = Field(default=0, ge=0, le=360000)
+    vision_model: str | None = Field(default=None, max_length=200)
+    use_vision: bool = True
 
 
 class HeartbeatRequest(BaseModel):
@@ -63,7 +65,8 @@ def watch_start(req: StartRequest, request: Request) -> dict:
     if not (local_speech.engine_available() and local_speech.model_ready()):
         raise HTTPException(409, messages.t("speech.model_missing"))
     try:
-        return watch_along.start(req.platform, req.video_id, req.page, req.region.model_dump(), req.offset)
+        return watch_along.start(req.platform, req.video_id, req.page, req.region.model_dump(), req.offset,
+                                 vision_model=req.vision_model, use_vision=req.use_vision)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
 

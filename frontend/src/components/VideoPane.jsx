@@ -10,7 +10,7 @@ const MODE_KEY = 'astratube-subtitle-mode'
 
 // YouTube 播放器放在獨立來源的 iframe（public/player/youtube.html）內，
 // 官方 IFrame API 腳本只在那個 iframe 執行，不會進入具有 Tauri IPC 的主視窗。
-export function YouTubePlayer({ videoId, startAt, onTime }) {
+export function YouTubePlayer({ videoId, startAt, onTime, onFallback }) {
   const frameRef = useRef(null)
   const readyRef = useRef(false)
   const seekRef = useRef(startAt)
@@ -29,6 +29,8 @@ export function YouTubePlayer({ videoId, startAt, onTime }) {
   }, [videoId])
 
   useEffect(() => { onTimeRef.current = onTime }, [onTime])
+  // 退回一般嵌入時不會再有進度與播放狀態回報；陪看模式要改用聲音判斷狀態
+  useEffect(() => { if (fallback) onFallback?.() }, [fallback])
 
   function sendSeek(target) {
     const frame = frameRef.current?.contentWindow
@@ -62,7 +64,7 @@ export function YouTubePlayer({ videoId, startAt, onTime }) {
         const next = seekRef.current
         if (next.t > 0 || next.auto) sendSeek(next)
       } else if (message.type === 'time') {
-        onTimeRef.current(message.seconds)
+        onTimeRef.current(message.seconds, message.state)
       } else {
         window.clearTimeout(timer)
         setFallback(true)
@@ -228,7 +230,7 @@ export default function VideoPane({ localSrc=null, onPickLocal, videoId, startAt
         {platform === 'local' ?
           <LocalPlayer src={localSrc} startAt={seek} onTime={setTime} onPickAgain={onPickLocal} /> :
         platform === 'youtube' ?
-          <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={setTime} /> :
+          <YouTubePlayer key={videoId} videoId={videoId} startAt={seek} onTime={seconds => setTime(seconds)} /> :
           <iframe key={`${startAt.key}:${manualSeek.key}`} src={biliSrc} title="Bilibili"
             allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
         {/* Bilibili 讀不到播放進度，其他來源才能把字幕對到畫面上；不攔截滑鼠，不影響播放器操作 */}

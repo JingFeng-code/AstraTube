@@ -503,6 +503,26 @@ button:disabled{cursor:not-allowed}
 .watch-along{display:flex;flex-direction:column;gap:10px;width:min(100%,900px);margin:16px auto;padding:0 16px}
 .watch-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:16px}
 .watch-head button,.watch-controls button{min-height:34px;font-size:13px}
+/* 陪看狀態列：左邊是現在有沒有在記錄，右邊是唯一的主要按鈕 */
+.watch-bar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-control);background:var(--surface)}
+.watch-bar .watch-primary{margin-left:auto;min-height:36px;font-size:14px}
+.watch-bar .watch-primary.is-ready{box-shadow:0 0 0 3px var(--accent-soft)}
+.watch-state{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:750;color:var(--text)}
+.watch-state i{width:9px;height:9px;border-radius:50%;background:var(--text-faint)}
+.watch-state-recording i{background:var(--danger);animation:watch-pulse 1.6s ease-in-out infinite}
+.watch-state-ended{color:var(--accent)}
+.watch-state-paused,.watch-state-quiet,.watch-state-waiting{color:var(--text-faint)}
+@keyframes watch-pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.watch-state-recording i{animation:none}}
+.watch-counts{color:var(--text-faint);font-size:13px}
+.watch-model{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-faint)}
+.watch-model select{height:34px;max-width:260px;border:1px solid var(--border);border-radius:var(--radius-small);background:var(--surface-2);color:var(--text);padding:0 8px;font-size:13px}
+.watch-sub{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.watch-discard{border:0;background:transparent;color:var(--text-faint);font-size:13px;text-decoration:underline;padding:4px 0}
+.watch-discard:hover:not(:disabled){color:var(--danger)}
+.watch-discard-confirm{display:inline-flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--danger);font-size:13px}
+.watch-discard-confirm button{min-height:30px;font-size:13px}
+.watch-discard-confirm .danger{color:var(--danger);border-color:var(--danger)}
 .watch-frame{width:100%}
 .watch-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .watch-live{font-size:14px;font-weight:750;color:var(--text)}

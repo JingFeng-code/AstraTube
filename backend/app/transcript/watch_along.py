@@ -149,6 +149,8 @@ class Session:
         return {"state": self.state, "platform": self.platform, "video_id": self.video_id, "page": self.page,
                 "elapsed": round(time.time() - self.started), "cue_count": len(self.cues),
                 "visual_count": len(self.visuals), "vision_model": self.vision_model,
+                # 最近 3 秒有沒有聽到聲音：Bilibili 讀不到播放狀態，用這個判斷是不是暫停了
+                "audible": time.time() - self.last_loud_wall < 3,
                 "warnings": sorted(self.warnings), "error": self.error,
                 "recent": [{"t": round(t, 1), "text": text[:120]} for t, text in recent]}
 
@@ -418,7 +420,9 @@ def status() -> dict:
     return recorder.session.status() if recorder else {"state": "idle"}
 
 
-def start(platform: str, video_id: str, page: int, region: dict, offset: float, **factories) -> dict:
+def start(platform: str, video_id: str, page: int, region: dict, offset: float,
+          vision_model: str | None = None, use_vision: bool = True, **factories) -> dict:
+    """vision_model 是使用者選的看畫面模型（沒選就用設定或第一個）；use_vision=False 只記聲音。"""
     imported_subtitles.validate_identity(platform, video_id, page)
     with _lock:
         recorder = _current.get("recorder")
@@ -428,11 +432,17 @@ def start(platform: str, video_id: str, page: int, region: dict, offset: float, 
         if not pid:
             raise ValueError(messages.t("watch.desktop_only"))
         models = factories.pop("models", None)
-        models = vision_models() if models is None else models
-        preferred = (config.get("WATCH_VISION_MODEL") or "").strip()
-        model = preferred if preferred in models else (models[0] if models else None)
+        model = None
+        if use_vision:
+            models = vision_models() if models is None else models
+            chosen = (vision_model or "").strip()
+            if chosen and chosen not in models:
+                # 只接受本機已安裝、能看圖的模型；雲端模型或打錯的名稱都不能偷偷換成別的
+                raise ValueError(messages.t("watch.model_missing", model=chosen[:80]))
+            preferred = (config.get("WATCH_VISION_MODEL") or "").strip()
+            model = chosen or (preferred if preferred in models else (models[0] if models else None))
         session = Session(platform, video_id, page, region, offset, model)
-        if not model:
+        if use_vision and not model:
             session.warnings.add("no_vision_model")
         recorder = Recorder(session, pid, **factories)
         _current["recorder"] = recorder
@@ -464,6 +474,8 @@ def finish() -> dict:
     failed = session.state == "error"
     session.state = "finishing"
     if not recorder.stop():
+        if session.state == "cancelled":
+            return session.status()
         # 最後一段還在辨識或看圖：先不存，避免存到不完整的內容；再按一次結束就會接著等
         session.state = "running"
         session.error = messages.t("watch.still_processing")
@@ -478,9 +490,14 @@ def finish() -> dict:
         session.state = "error"
         session.error = session.error if failed else messages.t("watch.nothing_heard")
         return session.status()
-    imported_subtitles.save_cues(session.platform, session.video_id, session.page, "watch",
-                                 local_speech._fit_cue_limit(cues), visuals=visuals)
-    session.state = "done"
+    with _lock:
+        # 等待期間使用者按了「放棄」：已經從 _current 移除，就不能再存檔
+        if _current.get("recorder") is not recorder or session.state == "cancelled":
+            session.state = "cancelled"
+            return session.status()
+        imported_subtitles.save_cues(session.platform, session.video_id, session.page, "watch",
+                                     local_speech._fit_cue_limit(cues), visuals=visuals)
+        session.state = "done"
     return session.status()
 
 

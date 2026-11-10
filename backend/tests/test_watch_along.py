@@ -167,6 +167,31 @@ def test_without_vision_model_only_audio_is_recorded():
         assert result["state"] == "done" and result["visual_count"] == 0
 
 
+def test_user_picks_vision_model_or_turns_it_off():
+    models = ["llava:7b", "qwen3.5:latest"]
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}), \
+         patch.object(watch.local_speech, "new_vad", return_value=(FakeVad(), 512)):
+        # 選了第二個模型就用第二個，不再固定挑第一個
+        status = watch.start("youtube", YOUTUBE, 1, REGION, 0, vision_model="qwen3.5:latest", pid=1, models=models,
+                             audio_factory=lambda pid: FakeAudio(0), frames_factory=FakeFrames,
+                             recognize=lambda samples: ([], []), describe=lambda model, picture: "")
+        assert status["vision_model"] == "qwen3.5:latest" and "audible" in status
+        watch.cancel()
+        # 只記聲音：不看畫面，也不顯示「沒有看圖模型」的提醒
+        status = watch.start("youtube", YOUTUBE, 1, REGION, 0, use_vision=False, pid=1, models=models,
+                             audio_factory=lambda pid: FakeAudio(0), recognize=lambda samples: ([], []))
+        assert status["vision_model"] is None and "no_vision_model" not in status["warnings"]
+        watch.cancel()
+        # 不在本機看圖模型清單裡（例如雲端模型）就拒絕，不偷偷換成別的模型
+        try:
+            watch.start("youtube", YOUTUBE, 1, REGION, 0, vision_model="gpt-4o:cloud", pid=1, models=models)
+        except ValueError as exc:
+            assert "gpt-4o:cloud" in str(exc)
+        else:
+            raise AssertionError("unknown vision model must be rejected")
+        assert watch.status()["state"] != "running"
+
+
 def test_nothing_heard_does_not_overwrite_existing_subtitles():
     with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}):
         imported.save_cues("youtube", YOUTUBE, 1, "srt", [{"start": 0, "end": 1, "text": "原本", "translation": None}])
@@ -239,6 +264,32 @@ def test_finish_waits_for_slow_workers_instead_of_saving_partial_results():
         release.set()
         second = watch.finish()
         assert second["state"] == "done" and second["cue_count"] == 1 and not second["error"]
+
+
+def test_discard_during_finish_does_not_save():
+    """放棄和完成同時送出（例如確認框還開著就按了完成）：放棄要贏，不能存檔。"""
+    release = threading.Event()
+
+    def slow_recognize(samples):
+        release.wait(5)
+        return (list("好。"), [0.0, 0.2])
+
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}),          patch.object(watch.local_speech, "new_vad", return_value=(FakeVad(), 512)):
+        watch.start("youtube", YOUTUBE, 1, REGION, 0, pid=1, models=[], audio_factory=lambda pid: FakeAudio(1),
+                    recognize=slow_recognize)
+        time.sleep(0.3)
+        results = {}
+        finishing = threading.Thread(target=lambda: results.setdefault("finish", watch.finish()))
+        finishing.start()
+        time.sleep(0.2)
+        cancel_thread = threading.Thread(target=lambda: results.setdefault("cancel", watch.cancel()))
+        cancel_thread.start()
+        time.sleep(0.2)
+        release.set()
+        finishing.join(10)
+        cancel_thread.join(10)
+        assert results["finish"]["state"] == "cancelled", results
+        assert imported.load("youtube", YOUTUBE) is None
 
 
 def test_crop_uses_current_window_bounds():
@@ -336,9 +387,11 @@ if __name__ == "__main__":
     test_transcript_interleaves_visual_notes_and_labels_the_source()
     test_session_records_speech_and_frames_then_saves_for_analysis()
     test_without_vision_model_only_audio_is_recorded()
+    test_user_picks_vision_model_or_turns_it_off()
     test_nothing_heard_does_not_overwrite_existing_subtitles()
     test_audio_pause_inserts_silence_so_sentences_split()
     test_finish_waits_for_slow_workers_instead_of_saving_partial_results()
+    test_discard_during_finish_does_not_save()
     test_crop_uses_current_window_bounds()
     test_audio_is_recorded_from_the_webview2_browser_process()
     test_one_session_at_a_time_and_cancel()
