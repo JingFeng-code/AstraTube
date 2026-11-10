@@ -56,9 +56,10 @@ export function pickVisionModel(models, saved, provider) {
 }
 
 // 陪看時要讓使用者一眼看出「現在有沒有在記錄」。
-// YouTube 有播放狀態可用；Bilibili 讀不到，改看最近有沒有聽到聲音。
-export function watchPhase({ platform, playerState, audible }) {
-  if (platform === 'youtube') {
+// YouTube 有播放狀態可用；Bilibili 或 YouTube 退回一般嵌入（bridge === false）時讀不到，
+// 改看最近有沒有聽到聲音。
+export function watchPhase({ platform, playerState, audible, bridge = true }) {
+  if (platform === 'youtube' && bridge) {
     if (playerState === 'playing') return 'recording'
     return ['paused', 'ended', 'buffering'].includes(playerState) ? playerState : 'waiting'
   }

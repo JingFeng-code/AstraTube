@@ -41,6 +41,8 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
   const [models, setModels] = useState(null)
   const [vision, setVision] = useState('')
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // YouTube 播放器沒辦法回報狀態（退回一般嵌入）時改成 false
+  const [bridge, setBridge] = useState(true)
 
   const runningRef = useRef(false)
   useEffect(() => { runningRef.current = running; if (!running) setConfirmDiscard(false) }, [running])
@@ -128,6 +130,8 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
     } catch (exc) { setError(exc.message) } finally { setBusy(false) }
   }
   async function finish() {
+    // 已經按了完成：收起放棄的確認，避免同時送出放棄和完成
+    setConfirmDiscard(false)
     setBusy(true); setError('')
     try {
       const result = await finishWatch()
@@ -137,6 +141,7 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
     } catch (exc) { setError(exc.message) } finally { setBusy(false) }
   }
   async function discard() {
+    if (busy) return
     setConfirmDiscard(false)
     await cancelWatch().catch(() => {})
     onClose?.()
@@ -144,8 +149,8 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
 
   const biliSrc = `https://player.bilibili.com/player.html?bvid=${target.videoId}&p=${target.page}&autoplay=0`
   const warnings = session.warnings || []
-  const phase = watchPhase({ platform: target.platform, playerState, audible: session.audible })
-  const shownClock = formatClock(target.platform === 'youtube' ? clock : session.elapsed)
+  const phase = watchPhase({ platform: target.platform, playerState, audible: session.audible, bridge })
+  const shownClock = formatClock(target.platform === 'youtube' && bridge ? clock : session.elapsed)
   const ready = support?.available && support.speech_ready
 
   let bar
@@ -188,7 +193,7 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
       </div>
       <div className="video-frame watch-frame" ref={frameRef}>
         {target.platform === 'youtube' ?
-          <YouTubePlayer videoId={target.videoId} startAt={startAt} onTime={onTime} /> :
+          <YouTubePlayer videoId={target.videoId} startAt={startAt} onTime={onTime} onFallback={() => setBridge(false)} /> :
           <iframe src={biliSrc} title="Bilibili" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
       </div>
       <div className="watch-bar">{bar}</div>
@@ -197,8 +202,8 @@ export default function WatchAlong({ target, provider, onFinished, onClose }) {
         {confirmDiscard ?
           <span className="watch-discard-confirm" role="alert">
             {t('watch.discardConfirm')}
-            <button type="button" className="btn-paper danger" onClick={discard}>{t('watch.discardYes')}</button>
-            <button type="button" className="btn-paper" onClick={() => setConfirmDiscard(false)}>{t('watch.discardNo')}</button>
+            <button type="button" className="btn-paper danger" onClick={discard} disabled={busy}>{t('watch.discardYes')}</button>
+            <button type="button" className="btn-paper" onClick={() => setConfirmDiscard(false)} disabled={busy}>{t('watch.discardNo')}</button>
           </span> :
           <button type="button" className="watch-discard" onClick={() => setConfirmDiscard(true)} disabled={busy}>{t('watch.discard')}</button>}
       </div>}

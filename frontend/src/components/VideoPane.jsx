@@ -10,7 +10,7 @@ const MODE_KEY = 'astratube-subtitle-mode'
 
 // YouTube 播放器放在獨立來源的 iframe（public/player/youtube.html）內，
 // 官方 IFrame API 腳本只在那個 iframe 執行，不會進入具有 Tauri IPC 的主視窗。
-export function YouTubePlayer({ videoId, startAt, onTime }) {
+export function YouTubePlayer({ videoId, startAt, onTime, onFallback }) {
   const frameRef = useRef(null)
   const readyRef = useRef(false)
   const seekRef = useRef(startAt)
@@ -29,6 +29,8 @@ export function YouTubePlayer({ videoId, startAt, onTime }) {
   }, [videoId])
 
   useEffect(() => { onTimeRef.current = onTime }, [onTime])
+  // 退回一般嵌入時不會再有進度與播放狀態回報；陪看模式要改用聲音判斷狀態
+  useEffect(() => { if (fallback) onFallback?.() }, [fallback])
 
   function sendSeek(target) {
     const frame = frameRef.current?.contentWindow

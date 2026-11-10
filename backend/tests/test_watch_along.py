@@ -266,6 +266,32 @@ def test_finish_waits_for_slow_workers_instead_of_saving_partial_results():
         assert second["state"] == "done" and second["cue_count"] == 1 and not second["error"]
 
 
+def test_discard_during_finish_does_not_save():
+    """放棄和完成同時送出（例如確認框還開著就按了完成）：放棄要贏，不能存檔。"""
+    release = threading.Event()
+
+    def slow_recognize(samples):
+        release.wait(5)
+        return (list("好。"), [0.0, 0.2])
+
+    with TemporaryDirectory() as location, patch.object(imported, "CACHE_DIR", Path(location)), patch.object(watch, "_current", {}),          patch.object(watch.local_speech, "new_vad", return_value=(FakeVad(), 512)):
+        watch.start("youtube", YOUTUBE, 1, REGION, 0, pid=1, models=[], audio_factory=lambda pid: FakeAudio(1),
+                    recognize=slow_recognize)
+        time.sleep(0.3)
+        results = {}
+        finishing = threading.Thread(target=lambda: results.setdefault("finish", watch.finish()))
+        finishing.start()
+        time.sleep(0.2)
+        cancel_thread = threading.Thread(target=lambda: results.setdefault("cancel", watch.cancel()))
+        cancel_thread.start()
+        time.sleep(0.2)
+        release.set()
+        finishing.join(10)
+        cancel_thread.join(10)
+        assert results["finish"]["state"] == "cancelled", results
+        assert imported.load("youtube", YOUTUBE) is None
+
+
 def test_crop_uses_current_window_bounds():
     calls = []
     fake_capture = type("Cap", (), {"close": lambda self: None})()
@@ -365,6 +391,7 @@ if __name__ == "__main__":
     test_nothing_heard_does_not_overwrite_existing_subtitles()
     test_audio_pause_inserts_silence_so_sentences_split()
     test_finish_waits_for_slow_workers_instead_of_saving_partial_results()
+    test_discard_during_finish_does_not_save()
     test_crop_uses_current_window_bounds()
     test_audio_is_recorded_from_the_webview2_browser_process()
     test_one_session_at_a_time_and_cancel()

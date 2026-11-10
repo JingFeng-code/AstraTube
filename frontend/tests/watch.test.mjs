@@ -77,12 +77,20 @@ test('陪看狀態跟著播放器：暫停、播完不再顯示記錄中', () =>
   // Bilibili 讀不到播放狀態：用最近有沒有聲音判斷
   assert.equal(watchPhase({ platform: 'bilibili', audible: true }), 'recording')
   assert.equal(watchPhase({ platform: 'bilibili', audible: false }), 'quiet')
+  // YouTube 播放器退回一般嵌入、收不到狀態時，不能一直顯示「等待播放」
+  assert.equal(watchPhase({ platform: 'youtube', playerState: 'waiting', bridge: false, audible: true }), 'recording')
+  assert.equal(watchPhase({ platform: 'youtube', bridge: false, audible: false }), 'quiet')
+  const component = read('../src/components/WatchAlong.jsx')
+  assert.match(component, /onFallback=\{\(\) => setBridge\(false\)\}/)
+  assert.match(read('../src/components/VideoPane.jsx'), /if \(fallback\) onFallback\?\.\(\)/)
 })
 
 test('陪看版面：只有一個主要按鈕，放棄要再確認，進入陪看時收起上方錯誤區', () => {
   const component = read('../src/components/WatchAlong.jsx')
   assert.match(component, /onClick=\{\(\) => setConfirmDiscard\(true\)\}/)
-  assert.match(component, /onClick=\{discard\}/)
+  // 完成中不能再按放棄，否則放棄和完成會同時送出
+  assert.match(component, /onClick=\{discard\} disabled=\{busy\}/)
+  assert.match(component, /async function finish\(\) \{[^}]*?setConfirmDiscard\(false\)/)
   // 陪看中右上角不再有會丟掉記錄的按鈕
   assert.match(component, /\{!running && session\.state !== 'finishing' && <button[^>]*onClick=\{onClose\}/)
   assert.match(component, /use_vision: useVision, vision_model: useVision && vision \? vision : null/)

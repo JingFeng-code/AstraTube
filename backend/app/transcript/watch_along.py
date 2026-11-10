@@ -474,6 +474,8 @@ def finish() -> dict:
     failed = session.state == "error"
     session.state = "finishing"
     if not recorder.stop():
+        if session.state == "cancelled":
+            return session.status()
         # 最後一段還在辨識或看圖：先不存，避免存到不完整的內容；再按一次結束就會接著等
         session.state = "running"
         session.error = messages.t("watch.still_processing")
@@ -488,9 +490,14 @@ def finish() -> dict:
         session.state = "error"
         session.error = session.error if failed else messages.t("watch.nothing_heard")
         return session.status()
-    imported_subtitles.save_cues(session.platform, session.video_id, session.page, "watch",
-                                 local_speech._fit_cue_limit(cues), visuals=visuals)
-    session.state = "done"
+    with _lock:
+        # 等待期間使用者按了「放棄」：已經從 _current 移除，就不能再存檔
+        if _current.get("recorder") is not recorder or session.state == "cancelled":
+            session.state = "cancelled"
+            return session.status()
+        imported_subtitles.save_cues(session.platform, session.video_id, session.page, "watch",
+                                     local_speech._fit_cue_limit(cues), visuals=visuals)
+        session.state = "done"
     return session.status()
 
 
